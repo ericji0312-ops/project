@@ -296,13 +296,18 @@ export default function ScheduleAssignment() {
       </section>
 
       {curriculum && (
-        <section className="overflow-x-auto border rounded">
+        <section className="overflow-auto border rounded max-h-[42vh]">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-gray-100 dark:bg-neutral-800">
-                <th className="border px-2 py-1 text-left w-16">회차</th>
+              <tr>
+                <th className="sticky top-0 z-10 border bg-gray-100 dark:bg-neutral-800 px-2 py-1 text-left w-16">
+                  회차
+                </th>
                 {columns.map((col) => (
-                  <th key={col} className="border px-2 py-1 text-left">
+                  <th
+                    key={col}
+                    className="sticky top-0 z-10 border bg-gray-100 dark:bg-neutral-800 px-2 py-1 text-left"
+                  >
                     {col}
                   </th>
                 ))}
