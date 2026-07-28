@@ -10,6 +10,11 @@ interface SheetConfig {
   subjectId: string; // "__new__" 이면 newSubjectName 사용
   newSubjectName: string;
   loaded: boolean;
+  /** 적재 시점에 병합/신규생성 중 어떤 동작이었는지 (완료 후 라벨 표시용 — 신규 생성 직후엔
+   * curriculumName이 자기 자신과 매칭돼버려 실시간 matched 값을 쓰면 라벨이 잘못 나온다) */
+  loadedAsMerge?: boolean;
+  /** 병합 적재 후 실제로 추가된 회차 수 (병합 모드였을 때만 채워짐) */
+  mergedAddedCount?: number;
 }
 
 function detectHasTypedComponents(data: ParsedCurriculumData): boolean {
@@ -28,6 +33,7 @@ export default function UploadCurriculum() {
   const scheduleComponents = useScheduleStore((s) => s.scheduleComponents);
   const addSubject = useScheduleStore((s) => s.addSubject);
   const addCurriculum = useScheduleStore((s) => s.addCurriculum);
+  const mergeCurriculum = useScheduleStore((s) => s.mergeCurriculum);
   const deleteCurriculum = useScheduleStore((s) => s.deleteCurriculum);
 
   useEffect(() => {
@@ -111,7 +117,27 @@ export default function UploadCurriculum() {
         data.scheduleComponents
       );
 
-      updateConfig(sheetName, { loaded: true });
+      updateConfig(sheetName, { loaded: true, loadedAsMerge: false });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingSheet(null);
+    }
+  }
+
+  async function handleMerge(sheetName: string, curriculumId: string) {
+    const data = parsedBySheet[sheetName];
+    if (!data) return;
+
+    setError(null);
+    setLoadingSheet(sheetName);
+    try {
+      const addedCount = await mergeCurriculum(
+        curriculumId,
+        data.scheduleItems,
+        data.scheduleComponents
+      );
+      updateConfig(sheetName, { loaded: true, loadedAsMerge: true, mergedAddedCount: addedCount });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -150,6 +176,21 @@ export default function UploadCurriculum() {
         const config = configBySheet[sheetName];
         if (!config) return null;
 
+        const matched = curricula.find((c) => c.name === config.curriculumName.trim());
+        const existingOrdersForMatched = matched
+          ? new Set(
+              scheduleItems.filter((i) => i.curriculumId === matched.id).map((i) => i.order)
+            )
+          : null;
+        const newOrderCount = existingOrdersForMatched
+          ? data.scheduleItems.filter((i) => !existingOrdersForMatched.has(i.order)).length
+          : 0;
+        const existingOrderCount = data.scheduleItems.length - newOrderCount;
+        // 적재 완료 후에는 그 시점에 실제로 어떤 동작이었는지(loadedAsMerge)를 기준으로 표시한다.
+        // 그렇지 않으면 신규 생성 직후 curriculumName이 방금 만든 자기 자신과 매칭되어
+        // 화면이 "병합됨"으로 잘못 보인다.
+        const showAsMerge = config.loaded ? Boolean(config.loadedAsMerge) : Boolean(matched);
+
         return (
           <div key={sheetName} className="border rounded p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -172,24 +213,26 @@ export default function UploadCurriculum() {
                 />
               </label>
 
-              <label className="flex flex-col gap-1">
-                <span className="font-medium">과목</span>
-                <select
-                  className="border rounded px-2 py-1"
-                  value={config.subjectId}
-                  disabled={config.loaded}
-                  onChange={(e) => updateConfig(sheetName, { subjectId: e.target.value })}
-                >
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                  <option value="__new__">+ 새 과목 추가</option>
-                </select>
-              </label>
+              {!showAsMerge && (
+                <label className="flex flex-col gap-1">
+                  <span className="font-medium">과목</span>
+                  <select
+                    className="border rounded px-2 py-1"
+                    value={config.subjectId}
+                    disabled={config.loaded}
+                    onChange={(e) => updateConfig(sheetName, { subjectId: e.target.value })}
+                  >
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                    <option value="__new__">+ 새 과목 추가</option>
+                  </select>
+                </label>
+              )}
 
-              {config.subjectId === "__new__" && (
+              {!showAsMerge && config.subjectId === "__new__" && (
                 <label className="flex flex-col gap-1 col-span-2">
                   <span className="font-medium">새 과목 이름</span>
                   <input
@@ -202,27 +245,35 @@ export default function UploadCurriculum() {
               )}
             </div>
 
-            <div className="flex items-center gap-4">
-              <span className="font-medium">구성요소 타입 구분</span>
-              <label className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  disabled={config.loaded}
-                  checked={config.hasTypedComponents}
-                  onChange={() => updateConfig(sheetName, { hasTypedComponents: true })}
-                />
-                있음 (일반형 — 개념/연산/RX/라이트쎈/오답노트 등)
-              </label>
-              <label className="flex items-center gap-1">
-                <input
-                  type="radio"
-                  disabled={config.loaded}
-                  checked={!config.hasTypedComponents}
-                  onChange={() => updateConfig(sheetName, { hasTypedComponents: false })}
-                />
-                없음 (기출형)
-              </label>
-            </div>
+            {!config.loaded &&
+              (matched ? (
+                <p className="text-blue-700 bg-blue-50 dark:bg-blue-950 rounded p-2">
+                  기존 커리큘럼 <strong>{matched.name}</strong>에 병합됩니다 — 새 회차{" "}
+                  <strong>{newOrderCount}개</strong> 추가 예정
+                  {existingOrderCount > 0 && ` (이미 있는 회차 ${existingOrderCount}개는 건너뜀)`}
+                  {newOrderCount === 0 && " · 추가할 새 회차가 없습니다"}
+                </p>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <span className="font-medium">구성요소 타입 구분</span>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      checked={config.hasTypedComponents}
+                      onChange={() => updateConfig(sheetName, { hasTypedComponents: true })}
+                    />
+                    있음 (일반형 — 개념/연산/RX/라이트쎈/오답노트 등)
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input
+                      type="radio"
+                      checked={!config.hasTypedComponents}
+                      onChange={() => updateConfig(sheetName, { hasTypedComponents: false })}
+                    />
+                    없음 (기출형)
+                  </label>
+                </div>
+              ))}
 
             <div className="text-gray-600 dark:text-gray-400">
               회차 {data.scheduleItems.length}개 · 구성요소 {data.scheduleComponents.length}개
@@ -261,14 +312,24 @@ export default function UploadCurriculum() {
 
             <button
               className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-40"
-              disabled={config.loaded || loadingSheet === sheetName}
-              onClick={() => handleLoad(sheetName)}
+              disabled={
+                config.loaded || loadingSheet === sheetName || (Boolean(matched) && newOrderCount === 0)
+              }
+              onClick={() =>
+                matched ? handleMerge(sheetName, matched.id) : handleLoad(sheetName)
+              }
             >
               {config.loaded
-                ? "적재 완료"
+                ? config.loadedAsMerge
+                  ? `병합 완료 (${config.mergedAddedCount ?? 0}개 회차 추가됨)`
+                  : "적재 완료"
                 : loadingSheet === sheetName
-                  ? "적재 중..."
-                  : "이 커리큘럼 적재하기"}
+                  ? matched
+                    ? "병합 중..."
+                    : "적재 중..."
+                  : matched
+                    ? "이 커리큘럼에 병합하기"
+                    : "이 커리큘럼 적재하기"}
             </button>
           </div>
         );

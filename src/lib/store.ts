@@ -88,6 +88,12 @@ interface ScheduleStore {
     components: ScheduleComponent[]
   ) => Promise<void>;
   deleteCurriculum: (curriculumId: string) => Promise<void>;
+  /** 같은 커리큘럼에 새 회차만 이어붙인다. 이미 있는 order_no는 건드리지 않는다. 반환값은 추가된 회차 수. */
+  mergeCurriculum: (
+    curriculumId: string,
+    items: ScheduleItem[],
+    components: ScheduleComponent[]
+  ) => Promise<number>;
   createAssignments: (
     lines: { studentId: string; scheduleComponentId: string; deadlineDate: string }[]
   ) => Promise<void>;
@@ -222,6 +228,52 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       scheduleItems: [...state.scheduleItems, ...realItems],
       scheduleComponents: [...state.scheduleComponents, ...realComponents],
     }));
+  },
+
+  mergeCurriculum: async (curriculumId, items, components) => {
+    const existingOrders = new Set(
+      get()
+        .scheduleItems.filter((i) => i.curriculumId === curriculumId)
+        .map((i) => i.order)
+    );
+    const newItems = items.filter((i) => !existingOrders.has(i.order));
+    if (newItems.length === 0) return 0;
+
+    const newItemTempIds = new Set(newItems.map((i) => i.id));
+    const newComponents = components.filter((c) => newItemTempIds.has(c.scheduleItemId));
+
+    const { data: itemRows, error: itemsError } = await supabase
+      .from("schedule_items")
+      .insert(newItems.map((i) => ({ curriculum_id: curriculumId, order_no: i.order })))
+      .select();
+    if (itemsError) throw new Error(itemsError.message);
+
+    const realItems = itemRows.map(mapScheduleItem);
+    const orderNoToRealId = new Map(realItems.map((i) => [i.order, i.id]));
+    const tempIdToRealId = new Map(newItems.map((i) => [i.id, orderNoToRealId.get(i.order)!]));
+
+    const { data: componentRows, error: componentsError } = await supabase
+      .from("schedule_components")
+      .insert(
+        newComponents.map((c) => ({
+          schedule_item_id: tempIdToRealId.get(c.scheduleItemId),
+          type: c.type,
+          type_label: c.typeLabel,
+          content: c.content,
+          raw_text: c.rawText,
+        }))
+      )
+      .select();
+    if (componentsError) throw new Error(componentsError.message);
+
+    const realComponents = componentRows.map(mapScheduleComponent);
+
+    set((state) => ({
+      scheduleItems: [...state.scheduleItems, ...realItems],
+      scheduleComponents: [...state.scheduleComponents, ...realComponents],
+    }));
+
+    return newItems.length;
   },
 
   deleteCurriculum: async (curriculumId) => {
