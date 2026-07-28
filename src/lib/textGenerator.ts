@@ -24,8 +24,15 @@ export interface AssignedLine {
 }
 
 /**
- * 마감기한(날짜)별로 한 줄씩 묶어 복사용 텍스트를 생성한다.
- * 형식: "● 마감기한 : 7/23 (목) - [커리큘럼] 타입 : 내용 - ..."
+ * 마감기한(날짜)별로 묶어 복사용 텍스트를 생성한다. 항목은 "-" 단위로 줄바꿈하고,
+ * 날짜가 바뀔 때마다 한 줄을 더 띄운다. 형식:
+ *
+ * ● 마감기한 : 7/23 (목)
+ * - [커리큘럼] 타입 : 내용
+ * - [커리큘럼] 타입 : 내용
+ *
+ * ● 마감기한 : 7/24 (금)
+ * - [커리큘럼] 타입 : 내용
  */
 export function generateCopyText(assignments: AssignedLine[]): string {
   const byDate = new Map<string, AssignedLine[]>();
@@ -40,8 +47,8 @@ export function generateCopyText(assignments: AssignedLine[]): string {
   return sortedDates
     .map((date) => {
       const items = byDate.get(date)!;
-      const parts = items.map((a) => formatComponentLine(a.curriculum, a.component));
-      return `● 마감기한 : ${formatDateHeader(date)} - ${parts.join(" - ")}`;
+      const lines = items.map((a) => `- ${formatComponentLine(a.curriculum, a.component)}`);
+      return [`● 마감기한 : ${formatDateHeader(date)}`, ...lines].join("\n");
     })
-    .join("\n");
+    .join("\n\n");
 }
