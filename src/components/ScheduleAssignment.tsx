@@ -47,6 +47,7 @@ export default function ScheduleAssignment() {
   const [deadlineMode, setDeadlineMode] = useState<"auto" | "manual">("auto");
   const [autoStartDate, setAutoStartDate] = useState(toISODateLocal(new Date()));
   const [autoIntervalDays, setAutoIntervalDays] = useState(1);
+  const [autoRowsPerDay, setAutoRowsPerDay] = useState(1);
   const [manualDates, setManualDates] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -169,14 +170,38 @@ export default function ScheduleAssignment() {
     if (!curriculum || selectedIds.size === 0) return;
 
     const selectedOrdered = orderedVisibleComponents.filter((c) => selectedIds.has(c.id));
-    const lines = selectedOrdered.map((component, index) => ({
-      studentId,
-      scheduleComponentId: component.id,
-      deadlineDate:
-        deadlineMode === "auto"
-          ? addDays(autoStartDate, index * autoIntervalDays)
-          : manualDates[component.id] || autoStartDate,
-    }));
+
+    // 자동 배분: 선택된 항목이 걸쳐 있는 회차(행)를 등장 순서대로 나열한 뒤,
+    // "하루에 배정할 회차 수"만큼 묶어서 같은 날짜를 부여한다.
+    const rowOrderToChunkIndex = new Map<number, number>();
+    if (deadlineMode === "auto") {
+      const rowsPerDay = Math.max(1, autoRowsPerDay);
+      for (const item of itemsForCurriculum) {
+        const hasSelected = (componentsByItemId.get(item.id) ?? []).some((c) =>
+          selectedIds.has(c.id)
+        );
+        if (!hasSelected) continue;
+        const positionInSelectedRows = rowOrderToChunkIndex.size;
+        rowOrderToChunkIndex.set(item.order, Math.floor(positionInSelectedRows / rowsPerDay));
+      }
+    }
+
+    const lines = selectedOrdered.map((component) => {
+      if (deadlineMode !== "auto") {
+        return {
+          studentId,
+          scheduleComponentId: component.id,
+          deadlineDate: manualDates[component.id] || autoStartDate,
+        };
+      }
+      const item = itemById.get(component.scheduleItemId);
+      const chunkIndex = item ? (rowOrderToChunkIndex.get(item.order) ?? 0) : 0;
+      return {
+        studentId,
+        scheduleComponentId: component.id,
+        deadlineDate: addDays(autoStartDate, chunkIndex * autoIntervalDays),
+      };
+    });
 
     setSubmitting(true);
     setActionError(null);
@@ -386,6 +411,16 @@ export default function ScheduleAssignment() {
                 className="border rounded px-2 py-1 w-16"
                 value={autoIntervalDays}
                 onChange={(e) => setAutoIntervalDays(Number(e.target.value))}
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              하루에 배정할 회차 수
+              <input
+                type="number"
+                min={1}
+                className="border rounded px-2 py-1 w-16"
+                value={autoRowsPerDay}
+                onChange={(e) => setAutoRowsPerDay(Math.max(1, Number(e.target.value)))}
               />
             </label>
           </div>
