@@ -171,22 +171,11 @@ export default function ScheduleAssignment() {
 
     const selectedOrdered = orderedVisibleComponents.filter((c) => selectedIds.has(c.id));
 
-    // 자동 배분: 선택된 항목이 걸쳐 있는 회차(행)를 등장 순서대로 나열한 뒤,
-    // "하루에 배정할 회차 수"만큼 묶어서 같은 날짜를 부여한다.
-    const rowOrderToChunkIndex = new Map<number, number>();
-    if (deadlineMode === "auto") {
-      const rowsPerDay = Math.max(1, autoRowsPerDay);
-      for (const item of itemsForCurriculum) {
-        const hasSelected = (componentsByItemId.get(item.id) ?? []).some((c) =>
-          selectedIds.has(c.id)
-        );
-        if (!hasSelected) continue;
-        const positionInSelectedRows = rowOrderToChunkIndex.size;
-        rowOrderToChunkIndex.set(item.order, Math.floor(positionInSelectedRows / rowsPerDay));
-      }
-    }
+    // 자동 배분: 선택된 항목을 화면에 보이는 순서(행 → 컬럼) 그대로 나열한 뒤,
+    // "하루에 배정할 항목 수"만큼씩 끊어서 같은 날짜를 부여한다.
+    const rowsPerDay = Math.max(1, autoRowsPerDay);
 
-    const lines = selectedOrdered.map((component) => {
+    const lines = selectedOrdered.map((component, index) => {
       if (deadlineMode !== "auto") {
         return {
           studentId,
@@ -194,8 +183,7 @@ export default function ScheduleAssignment() {
           deadlineDate: manualDates[component.id] || autoStartDate,
         };
       }
-      const item = itemById.get(component.scheduleItemId);
-      const chunkIndex = item ? (rowOrderToChunkIndex.get(item.order) ?? 0) : 0;
+      const chunkIndex = Math.floor(index / rowsPerDay);
       return {
         studentId,
         scheduleComponentId: component.id,
@@ -414,7 +402,7 @@ export default function ScheduleAssignment() {
               />
             </label>
             <label className="flex items-center gap-2">
-              하루에 배정할 회차 수
+              하루에 배정할 항목 수
               <input
                 type="number"
                 min={1}
