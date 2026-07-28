@@ -1,0 +1,473 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useScheduleStore } from "@/lib/store";
+import { generateCopyText, type AssignedLine } from "@/lib/textGenerator";
+import type { ScheduleComponent } from "@/types/schedule";
+
+const TYPE_COLUMN_PRIORITY = ["개념", "연산", "RX", "쎈", "오답노트"];
+
+function toISODateLocal(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function addDays(isoDate: string, days: number): string {
+  const d = new Date(`${isoDate}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return toISODateLocal(d);
+}
+
+export default function ScheduleAssignment() {
+  const initialized = useScheduleStore((s) => s.initialized);
+  const loading = useScheduleStore((s) => s.loading);
+  const storeError = useScheduleStore((s) => s.error);
+  const fetchAll = useScheduleStore((s) => s.fetchAll);
+  const subjects = useScheduleStore((s) => s.subjects);
+  const curricula = useScheduleStore((s) => s.curricula);
+  const scheduleItems = useScheduleStore((s) => s.scheduleItems);
+  const scheduleComponents = useScheduleStore((s) => s.scheduleComponents);
+  const students = useScheduleStore((s) => s.students);
+  const assignments = useScheduleStore((s) => s.assignments);
+  const addStudent = useScheduleStore((s) => s.addStudent);
+  const createAssignments = useScheduleStore((s) => s.createAssignments);
+  const resetAssignmentsForStudent = useScheduleStore((s) => s.resetAssignmentsForStudent);
+
+  useEffect(() => {
+    if (!initialized) fetchAll();
+  }, [initialized, fetchAll]);
+
+  const [studentId, setStudentId] = useState("");
+  const [subjectId, setSubjectId] = useState("");
+  const [curriculumId, setCurriculumId] = useState("");
+  const [newStudentName, setNewStudentName] = useState("");
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deadlineMode, setDeadlineMode] = useState<"auto" | "manual">("auto");
+  const [autoStartDate, setAutoStartDate] = useState(toISODateLocal(new Date()));
+  const [autoIntervalDays, setAutoIntervalDays] = useState(1);
+  const [manualDates, setManualDates] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!studentId && students.length > 0) setStudentId(students[0].id);
+  }, [students, studentId]);
+
+  useEffect(() => {
+    if (!subjectId && subjects.length > 0) setSubjectId(subjects[0].id);
+  }, [subjects, subjectId]);
+
+  useEffect(() => {
+    if (!curriculumId && subjectId) {
+      const first = curricula.find((c) => c.subjectId === subjectId);
+      if (first) setCurriculumId(first.id);
+    }
+  }, [subjectId, curricula, curriculumId]);
+
+  const curriculaForSubject = useMemo(
+    () => curricula.filter((c) => c.subjectId === subjectId),
+    [curricula, subjectId]
+  );
+
+  const curriculum = curricula.find((c) => c.id === curriculumId) ?? null;
+
+  const itemsForCurriculum = useMemo(
+    () =>
+      scheduleItems
+        .filter((i) => i.curriculumId === curriculumId)
+        .sort((a, b) => a.order - b.order),
+    [scheduleItems, curriculumId]
+  );
+
+  const componentsByItemId = useMemo(() => {
+    const map = new Map<string, ScheduleComponent[]>();
+    for (const c of scheduleComponents) {
+      if (!map.has(c.scheduleItemId)) map.set(c.scheduleItemId, []);
+      map.get(c.scheduleItemId)!.push(c);
+    }
+    return map;
+  }, [scheduleComponents]);
+
+  const columns = useMemo(() => {
+    if (!curriculum || !curriculum.hasTypedComponents) return ["내용"];
+    const found = new Set<string>();
+    for (const item of itemsForCurriculum) {
+      for (const c of componentsByItemId.get(item.id) ?? []) found.add(c.type);
+    }
+    const ordered = TYPE_COLUMN_PRIORITY.filter((t) => found.has(t));
+    const rest = [...found].filter((t) => !TYPE_COLUMN_PRIORITY.includes(t));
+    return [...ordered, ...rest];
+  }, [curriculum, itemsForCurriculum, componentsByItemId]);
+
+  // 테이블에 실제 렌더되는 순서 (행 → 컬럼) — 자동 배분 시 이 순서를 기준으로 날짜를 매긴다.
+  const orderedVisibleComponents = useMemo(() => {
+    const list: ScheduleComponent[] = [];
+    for (const item of itemsForCurriculum) {
+      const comps = componentsByItemId.get(item.id) ?? [];
+      if (!curriculum?.hasTypedComponents) {
+        list.push(...comps);
+        continue;
+      }
+      for (const col of columns) {
+        list.push(...comps.filter((c) => c.type === col));
+      }
+    }
+    return list;
+  }, [itemsForCurriculum, componentsByItemId, columns, curriculum]);
+
+  const itemById = useMemo(() => new Map(scheduleItems.map((i) => [i.id, i])), [scheduleItems]);
+  const curriculumById = useMemo(() => new Map(curricula.map((c) => [c.id, c])), [curricula]);
+  const componentById = useMemo(
+    () => new Map(scheduleComponents.map((c) => [c.id, c])),
+    [scheduleComponents]
+  );
+
+  const currentAssignmentLines: AssignedLine[] = useMemo(() => {
+    return assignments
+      .filter((a) => a.studentId === studentId)
+      .map((a) => {
+        const component = componentById.get(a.scheduleComponentId);
+        const item = component ? itemById.get(component.scheduleItemId) : undefined;
+        const curriculum = item ? curriculumById.get(item.curriculumId) : undefined;
+        if (!component || !curriculum) return null;
+        return { deadlineDate: a.deadlineDate, curriculum, component };
+      })
+      .filter((x): x is AssignedLine => x !== null);
+  }, [assignments, studentId, componentById, itemById, curriculumById]);
+
+  const assignedComponentIds = useMemo(
+    () => new Set(currentAssignmentLines.map((l) => l.component.id)),
+    [currentAssignmentLines]
+  );
+
+  function toggleComponent(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function handleSubjectChange(newSubjectId: string) {
+    setSubjectId(newSubjectId);
+    const firstCurriculum = curricula.find((c) => c.subjectId === newSubjectId);
+    setCurriculumId(firstCurriculum?.id ?? "");
+    setSelectedIds(new Set());
+    setManualDates({});
+  }
+
+  function handleStudentChange(newStudentId: string) {
+    setStudentId(newStudentId);
+    setSelectedIds(new Set());
+    setManualDates({});
+  }
+
+  async function handleAddStudent() {
+    const name = newStudentName.trim();
+    if (!name) return;
+    setActionError(null);
+    try {
+      const student = await addStudent(name);
+      setStudentId(student.id);
+      setNewStudentName("");
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function handleAssign() {
+    if (!curriculum || selectedIds.size === 0) return;
+
+    const selectedOrdered = orderedVisibleComponents.filter((c) => selectedIds.has(c.id));
+    const lines = selectedOrdered.map((component, index) => ({
+      studentId,
+      scheduleComponentId: component.id,
+      deadlineDate:
+        deadlineMode === "auto"
+          ? addDays(autoStartDate, index * autoIntervalDays)
+          : manualDates[component.id] || autoStartDate,
+    }));
+
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      await createAssignments(lines);
+      setSelectedIds(new Set());
+      setManualDates({});
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleResetAssignments() {
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      await resetAssignmentsForStudent(studentId);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const copyText = generateCopyText(currentAssignmentLines);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(copyText);
+  }
+
+  if (loading && !initialized) {
+    return <div className="p-6 text-sm text-gray-500">불러오는 중...</div>;
+  }
+
+  if (storeError) {
+    return <div className="p-6 text-sm text-red-600">데이터를 불러오지 못했습니다: {storeError}</div>;
+  }
+
+  return (
+    <div className="mx-auto max-w-5xl p-6 space-y-6 text-sm">
+      <h1 className="text-xl font-bold">학습스케줄 배정</h1>
+
+      {actionError && <p className="text-red-600">{actionError}</p>}
+
+      <section className="flex flex-wrap items-end gap-4">
+        <label className="flex flex-col gap-1">
+          <span className="font-medium">학생</span>
+          <select
+            className="border rounded px-2 py-1"
+            value={studentId}
+            onChange={(e) => handleStudentChange(e.target.value)}
+          >
+            {students.length === 0 && <option value="">학생 없음</option>}
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="flex items-end gap-1">
+          <label className="flex flex-col gap-1">
+            <span className="font-medium">학생 추가</span>
+            <input
+              className="border rounded px-2 py-1"
+              placeholder="이름"
+              value={newStudentName}
+              onChange={(e) => setNewStudentName(e.target.value)}
+            />
+          </label>
+          <button className="border rounded px-3 py-1" onClick={handleAddStudent}>
+            추가
+          </button>
+        </div>
+
+        <label className="flex flex-col gap-1">
+          <span className="font-medium">과목</span>
+          <select
+            className="border rounded px-2 py-1"
+            value={subjectId}
+            onChange={(e) => handleSubjectChange(e.target.value)}
+          >
+            {subjects.length === 0 && <option value="">과목 없음</option>}
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="font-medium">커리큘럼</span>
+          <select
+            className="border rounded px-2 py-1"
+            value={curriculumId}
+            onChange={(e) => {
+              setCurriculumId(e.target.value);
+              setSelectedIds(new Set());
+              setManualDates({});
+            }}
+          >
+            {curriculaForSubject.length === 0 && <option value="">커리큘럼 없음</option>}
+            {curriculaForSubject.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </section>
+
+      {curriculum && (
+        <section className="overflow-x-auto border rounded">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100 dark:bg-neutral-800">
+                <th className="border px-2 py-1 text-left w-16">회차</th>
+                {columns.map((col) => (
+                  <th key={col} className="border px-2 py-1 text-left">
+                    {col}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {itemsForCurriculum.map((item) => {
+                const comps = componentsByItemId.get(item.id) ?? [];
+                return (
+                  <tr key={item.id}>
+                    <td className="border px-2 py-1 align-top font-medium">{item.order}</td>
+                    {columns.map((col) => {
+                      const cellComponents = curriculum.hasTypedComponents
+                        ? comps.filter((c) => c.type === col)
+                        : comps;
+                      return (
+                        <td key={col} className="border px-2 py-1 align-top">
+                          <div className="flex flex-col gap-1">
+                            {cellComponents.map((c) => {
+                              const isAssigned = assignedComponentIds.has(c.id);
+                              return (
+                                <label
+                                  key={c.id}
+                                  className={`flex items-start gap-1 ${
+                                    isAssigned ? "opacity-40" : "cursor-pointer"
+                                  }`}
+                                  title={c.content}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="mt-0.5"
+                                    disabled={isAssigned}
+                                    checked={selectedIds.has(c.id)}
+                                    onChange={() => toggleComponent(c.id)}
+                                  />
+                                  <span className="line-clamp-2">
+                                    {c.content}
+                                    {isAssigned && (
+                                      <span className="ml-1 text-xs text-gray-500">(배정됨)</span>
+                                    )}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      <section className="space-y-3 border rounded p-4">
+        <div className="flex items-center gap-4">
+          <span className="font-medium">마감기한 배정 모드</span>
+          <label className="flex items-center gap-1">
+            <input
+              type="radio"
+              checked={deadlineMode === "auto"}
+              onChange={() => setDeadlineMode("auto")}
+            />
+            자동 배분
+          </label>
+          <label className="flex items-center gap-1">
+            <input
+              type="radio"
+              checked={deadlineMode === "manual"}
+              onChange={() => setDeadlineMode("manual")}
+            />
+            수동 지정
+          </label>
+        </div>
+
+        {deadlineMode === "auto" ? (
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2">
+              시작일
+              <input
+                type="date"
+                className="border rounded px-2 py-1"
+                value={autoStartDate}
+                onChange={(e) => setAutoStartDate(e.target.value)}
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              간격(일)
+              <input
+                type="number"
+                min={0}
+                className="border rounded px-2 py-1 w-16"
+                value={autoIntervalDays}
+                onChange={(e) => setAutoIntervalDays(Number(e.target.value))}
+              />
+            </label>
+          </div>
+        ) : (
+          selectedIds.size > 0 && (
+            <div className="space-y-1">
+              {orderedVisibleComponents
+                .filter((c) => selectedIds.has(c.id))
+                .map((c) => (
+                  <div key={c.id} className="flex items-center gap-2">
+                    <span className="flex-1 truncate">{c.content}</span>
+                    <input
+                      type="date"
+                      className="border rounded px-2 py-1"
+                      value={manualDates[c.id] ?? autoStartDate}
+                      onChange={(e) =>
+                        setManualDates((prev) => ({ ...prev, [c.id]: e.target.value }))
+                      }
+                    />
+                  </div>
+                ))}
+            </div>
+          )
+        )}
+
+        <button
+          className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-40"
+          disabled={selectedIds.size === 0 || submitting}
+          onClick={handleAssign}
+        >
+          배정하기 ({selectedIds.size}개 선택됨)
+        </button>
+      </section>
+
+      <section className="space-y-2 border rounded p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">복사용 텍스트</h2>
+          <div className="flex gap-2">
+            <button
+              className="text-xs border rounded px-2 py-1 disabled:opacity-40"
+              onClick={handleResetAssignments}
+              disabled={currentAssignmentLines.length === 0 || submitting}
+            >
+              배정 초기화
+            </button>
+            <button
+              className="text-xs bg-gray-800 text-white rounded px-2 py-1 disabled:opacity-40"
+              onClick={handleCopy}
+              disabled={!copyText}
+            >
+              복사
+            </button>
+          </div>
+        </div>
+        <pre className="whitespace-pre-wrap text-xs bg-gray-50 dark:bg-neutral-900 border rounded p-3 min-h-16">
+          {copyText || "배정된 항목이 없습니다."}
+        </pre>
+      </section>
+    </div>
+  );
+}
