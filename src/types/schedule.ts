@@ -22,7 +22,7 @@ export interface ScheduleItem {
   id: string;
   curriculumId: string;
   order: number; // 회차 번호
-  // 실제 원본 파일을 보면 같은 회차라도 구성요소마다(개념/연산/쎈/오답노트...) 참조하는
+  // 실제 원본 파일을 보면 같은 회차라도 구성요소마다(개념/연산/라이트쎈/오답노트...) 참조하는
   // 제목/범위가 서로 달라 회차 전체를 대표하는 단일 title을 두기 어렵다.
   // (예: "곱셈공식 암기" 항목은 그 회차의 "1.다항식의 연산" 개념과 무관하게 존재)
   // 따라서 title은 두지 않고, 회차는 순수하게 그룹핑 키(order)로만 사용한다.
@@ -30,7 +30,7 @@ export interface ScheduleItem {
 
 /**
  * 커리큘럼마다 실제 쓰이는 구성요소 타입은 다를 수 있어 열린 문자열로 둔다.
- * 일반형 커리큘럼에서 흔한 값: "개념" | "연산" | "RX" | "쎈" | "오답노트"
+ * 일반형 커리큘럼에서 흔한 값: "개념" | "연산" | "RX" | "라이트쎈" | "오답노트"
  * 기출형 커리큘럼은 hasTypedComponents=false 이므로 이 값이 화면/텍스트에 노출되지 않는다.
  */
 export type ComponentType = string;
@@ -38,7 +38,7 @@ export type ComponentType = string;
 export interface ScheduleComponent {
   id: string;
   scheduleItemId: string;
-  /** 정규화된 타입 (개념/연산/RX/쎈/오답노트/기타 등). UI 필터·컬럼 구분에 사용 */
+  /** 정규화된 타입 (개념/연산/RX/라이트쎈/오답노트/기타 등). UI 필터·컬럼 구분에 사용 */
   type: ComponentType;
   /**
    * 원본 파일에 적힌 타입 표기 그대로 (예: "공수1 개념", "라이트쎈(공수1)").

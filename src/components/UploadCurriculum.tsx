@@ -192,7 +192,7 @@ export default function UploadCurriculum() {
                   checked={config.hasTypedComponents}
                   onChange={() => updateConfig(sheetName, { hasTypedComponents: true })}
                 />
-                있음 (일반형 — 개념/연산/RX/쎈/오답노트 등)
+                있음 (일반형 — 개념/연산/RX/라이트쎈/오답노트 등)
               </label>
               <label className="flex items-center gap-1">
                 <input
