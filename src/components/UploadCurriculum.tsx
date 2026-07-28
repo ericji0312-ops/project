@@ -167,7 +167,15 @@ export default function UploadCurriculum() {
       </p>
 
       <div className="border rounded p-4">
-        <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} />
+        <input
+          type="file"
+          accept=".xlsx,.xls"
+          onChange={handleFileChange}
+          className="block w-full text-gray-700 dark:text-gray-300 cursor-pointer
+            file:mr-4 file:cursor-pointer file:rounded file:border-0
+            file:bg-blue-600 file:px-4 file:py-2 file:font-medium file:text-white
+            hover:file:bg-blue-700"
+        />
         {fileName && <p className="mt-2 text-gray-500">선택된 파일: {fileName}</p>}
         {error && <p className="mt-2 text-red-600">{error}</p>}
       </div>
