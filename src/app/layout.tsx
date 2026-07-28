@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
 import { isAuthenticated } from "@/lib/session";
 import LogoutButton from "@/components/LogoutButton";
+import NavLinks from "@/components/NavLinks";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -35,11 +35,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         {authenticated && (
           <nav className="flex items-center justify-between gap-4 border-b px-6 py-3 text-sm font-medium">
-            <div className="flex gap-4">
-              <Link href="/">배정화면</Link>
-              <Link href="/upload">엑셀 업로드</Link>
-              <Link href="/students">학생 관리</Link>
-            </div>
+            <NavLinks />
             <LogoutButton />
           </nav>
         )}
