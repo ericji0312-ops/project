@@ -94,15 +94,15 @@ export default function StudentManagement() {
         </button>
       </section>
 
-      <section className="border rounded divide-y">
+      <section className="space-y-2">
         {students.length === 0 && (
-          <p className="p-4 text-gray-500">등록된 학생이 없습니다.</p>
+          <p className="border rounded p-4 text-gray-500">등록된 학생이 없습니다.</p>
         )}
         {students.map((s) => {
           const count = assignmentCountByStudent.get(s.id) ?? 0;
           const isPending = pendingDeleteId === s.id;
           return (
-            <div key={s.id} className="flex items-center justify-between p-3">
+            <div key={s.id} className="flex items-center justify-between border rounded p-3">
               <div>
                 <span className="font-medium">{s.name}</span>
                 <span className="ml-2 text-xs text-gray-500">배정 {count}건</span>
