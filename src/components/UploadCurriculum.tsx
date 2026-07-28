@@ -23,8 +23,12 @@ export default function UploadCurriculum() {
   const initialized = useScheduleStore((s) => s.initialized);
   const fetchAll = useScheduleStore((s) => s.fetchAll);
   const subjects = useScheduleStore((s) => s.subjects);
+  const curricula = useScheduleStore((s) => s.curricula);
+  const scheduleItems = useScheduleStore((s) => s.scheduleItems);
+  const scheduleComponents = useScheduleStore((s) => s.scheduleComponents);
   const addSubject = useScheduleStore((s) => s.addSubject);
   const addCurriculum = useScheduleStore((s) => s.addCurriculum);
+  const deleteCurriculum = useScheduleStore((s) => s.deleteCurriculum);
 
   useEffect(() => {
     if (!initialized) fetchAll();
@@ -35,6 +39,8 @@ export default function UploadCurriculum() {
   const [configBySheet, setConfigBySheet] = useState<Record<string, SheetConfig>>({});
   const [error, setError] = useState<string | null>(null);
   const [loadingSheet, setLoadingSheet] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -110,6 +116,19 @@ export default function UploadCurriculum() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingSheet(null);
+    }
+  }
+
+  async function handleDeleteCurriculum(curriculumId: string) {
+    setError(null);
+    setDeleting(true);
+    try {
+      await deleteCurriculum(curriculumId);
+      setPendingDeleteId(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -254,6 +273,63 @@ export default function UploadCurriculum() {
           </div>
         );
       })}
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-bold">업로드된 커리큘럼</h2>
+        {curricula.length === 0 && (
+          <p className="text-gray-500">아직 업로드된 커리큘럼이 없습니다.</p>
+        )}
+        <div className="border rounded divide-y">
+          {curricula.map((c) => {
+            const subjectName = subjects.find((s) => s.id === c.subjectId)?.name ?? "(알 수 없음)";
+            const itemCount = scheduleItems.filter((i) => i.curriculumId === c.id).length;
+            const componentCount = scheduleComponents.filter((comp) =>
+              scheduleItems.some((i) => i.id === comp.scheduleItemId && i.curriculumId === c.id)
+            ).length;
+            const isPending = pendingDeleteId === c.id;
+
+            return (
+              <div key={c.id} className="flex items-center justify-between p-3">
+                <div>
+                  <span className="font-medium">{c.name}</span>
+                  <span className="ml-2 text-xs text-gray-500">
+                    {subjectName} · 회차 {itemCount}개 · 구성요소 {componentCount}개
+                  </span>
+                </div>
+
+                {isPending ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-red-600">
+                      정말 삭제할까요? (회차/구성요소/관련 배정 기록 모두 삭제됨)
+                    </span>
+                    <button
+                      className="text-xs bg-red-600 text-white rounded px-2 py-1 disabled:opacity-40"
+                      disabled={deleting}
+                      onClick={() => handleDeleteCurriculum(c.id)}
+                    >
+                      확인
+                    </button>
+                    <button
+                      className="text-xs border rounded px-2 py-1"
+                      disabled={deleting}
+                      onClick={() => setPendingDeleteId(null)}
+                    >
+                      취소
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="text-xs text-gray-500 hover:text-red-600"
+                    onClick={() => setPendingDeleteId(c.id)}
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

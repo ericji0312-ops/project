@@ -87,6 +87,7 @@ interface ScheduleStore {
     items: ScheduleItem[],
     components: ScheduleComponent[]
   ) => Promise<void>;
+  deleteCurriculum: (curriculumId: string) => Promise<void>;
   createAssignments: (
     lines: { studentId: string; scheduleComponentId: string; deadlineDate: string }[]
   ) => Promise<void>;
@@ -221,6 +222,35 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       scheduleItems: [...state.scheduleItems, ...realItems],
       scheduleComponents: [...state.scheduleComponents, ...realComponents],
     }));
+  },
+
+  deleteCurriculum: async (curriculumId) => {
+    const { error } = await supabase.from("curricula").delete().eq("id", curriculumId);
+    if (error) throw new Error(error.message);
+
+    // schedule_items -> schedule_components -> assignments 순으로 DB에서 FK cascade 삭제되므로
+    // 로컬 state도 같은 범위로 정리한다.
+    set((state) => {
+      const deletedItemIds = new Set(
+        state.scheduleItems.filter((i) => i.curriculumId === curriculumId).map((i) => i.id)
+      );
+      const deletedComponentIds = new Set(
+        state.scheduleComponents
+          .filter((c) => deletedItemIds.has(c.scheduleItemId))
+          .map((c) => c.id)
+      );
+
+      return {
+        curricula: state.curricula.filter((c) => c.id !== curriculumId),
+        scheduleItems: state.scheduleItems.filter((i) => i.curriculumId !== curriculumId),
+        scheduleComponents: state.scheduleComponents.filter(
+          (c) => !deletedItemIds.has(c.scheduleItemId)
+        ),
+        assignments: state.assignments.filter(
+          (a) => !deletedComponentIds.has(a.scheduleComponentId)
+        ),
+      };
+    });
   },
 
   createAssignments: async (lines) => {
