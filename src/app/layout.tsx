@@ -38,6 +38,7 @@ export default async function RootLayout({
             <div className="flex gap-4">
               <Link href="/">배정화면</Link>
               <Link href="/upload">엑셀 업로드</Link>
+              <Link href="/students">학생 관리</Link>
             </div>
             <LogoutButton />
           </nav>

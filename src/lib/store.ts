@@ -81,6 +81,7 @@ interface ScheduleStore {
   fetchAll: () => Promise<void>;
   addSubject: (name: string) => Promise<Subject>;
   addStudent: (name: string) => Promise<Student>;
+  deleteStudent: (studentId: string) => Promise<void>;
   addCurriculum: (
     curriculum: Omit<Curriculum, "id">,
     items: ScheduleItem[],
@@ -162,6 +163,17 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
     const student: Student = data;
     set((state) => ({ students: [...state.students, student] }));
     return student;
+  },
+
+  deleteStudent: async (studentId) => {
+    const { error } = await supabase.from("students").delete().eq("id", studentId);
+    if (error) throw new Error(error.message);
+
+    set((state) => ({
+      students: state.students.filter((s) => s.id !== studentId),
+      // 학생 삭제 시 배정 기록도 FK cascade로 DB에서 함께 삭제되므로 로컬 state도 맞춘다.
+      assignments: state.assignments.filter((a) => a.studentId !== studentId),
+    }));
   },
 
   addCurriculum: async (curriculum, items, components) => {

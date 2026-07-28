@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useScheduleStore } from "@/lib/store";
 import { generateCopyText, type AssignedLine } from "@/lib/textGenerator";
 import type { ScheduleComponent } from "@/types/schedule";
@@ -31,7 +32,6 @@ export default function ScheduleAssignment() {
   const scheduleComponents = useScheduleStore((s) => s.scheduleComponents);
   const students = useScheduleStore((s) => s.students);
   const assignments = useScheduleStore((s) => s.assignments);
-  const addStudent = useScheduleStore((s) => s.addStudent);
   const createAssignments = useScheduleStore((s) => s.createAssignments);
   const resetAssignmentsForStudent = useScheduleStore((s) => s.resetAssignmentsForStudent);
 
@@ -42,7 +42,6 @@ export default function ScheduleAssignment() {
   const [studentId, setStudentId] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [curriculumId, setCurriculumId] = useState("");
-  const [newStudentName, setNewStudentName] = useState("");
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deadlineMode, setDeadlineMode] = useState<"auto" | "manual">("auto");
@@ -166,19 +165,6 @@ export default function ScheduleAssignment() {
     setManualDates({});
   }
 
-  async function handleAddStudent() {
-    const name = newStudentName.trim();
-    if (!name) return;
-    setActionError(null);
-    try {
-      const student = await addStudent(name);
-      setStudentId(student.id);
-      setNewStudentName("");
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : String(e));
-    }
-  }
-
   async function handleAssign() {
     if (!curriculum || selectedIds.size === 0) return;
 
@@ -252,22 +238,12 @@ export default function ScheduleAssignment() {
               </option>
             ))}
           </select>
+          {students.length === 0 && (
+            <Link href="/students" className="text-xs text-blue-600 underline">
+              학생 관리에서 추가
+            </Link>
+          )}
         </label>
-
-        <div className="flex items-end gap-1">
-          <label className="flex flex-col gap-1">
-            <span className="font-medium">학생 추가</span>
-            <input
-              className="border rounded px-2 py-1"
-              placeholder="이름"
-              value={newStudentName}
-              onChange={(e) => setNewStudentName(e.target.value)}
-            />
-          </label>
-          <button className="border rounded px-3 py-1" onClick={handleAddStudent}>
-            추가
-          </button>
-        </div>
 
         <label className="flex flex-col gap-1">
           <span className="font-medium">과목</span>
