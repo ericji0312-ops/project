@@ -59,3 +59,27 @@ create index on assignments (schedule_component_id);
 -- 이 앱은 Supabase Auth를 쓰지 않고 앱 레벨의 공유 비밀번호로만 접근을 제어한다
 -- (스펙 참고). 따라서 RLS를 비활성 상태로 두고 anon key로 직접 읽기/쓰기 한다.
 -- 만약 나중에 실제 사용자별 인증을 도입하면 RLS를 켜고 정책을 추가해야 한다.
+
+-- ============================================================
+-- 마이그레이션 (2026-07-29): 학생이 실제로 듣는 과목 등록
+-- Supabase 대시보드 > SQL Editor 에서 아래 블록만 실행하면 됨.
+-- ============================================================
+
+create table student_subjects (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references students(id) on delete cascade,
+  subject_id uuid not null references subjects(id) on delete cascade,
+  unique (student_id, subject_id)
+);
+
+create index on student_subjects (student_id);
+create index on student_subjects (subject_id);
+
+-- 기존 배정 기록에서 이미 쓰이고 있던 학생-과목 조합을 역산해 채워 넣는다 (하위 호환).
+insert into student_subjects (student_id, subject_id)
+select distinct a.student_id, c.subject_id
+from assignments a
+join schedule_components sc on sc.id = a.schedule_component_id
+join schedule_items si on si.id = sc.schedule_item_id
+join curricula c on c.id = si.curriculum_id
+on conflict (student_id, subject_id) do nothing;

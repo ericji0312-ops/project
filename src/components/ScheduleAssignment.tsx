@@ -31,6 +31,7 @@ export default function ScheduleAssignment() {
   const scheduleItems = useScheduleStore((s) => s.scheduleItems);
   const scheduleComponents = useScheduleStore((s) => s.scheduleComponents);
   const students = useScheduleStore((s) => s.students);
+  const studentSubjects = useScheduleStore((s) => s.studentSubjects);
   const assignments = useScheduleStore((s) => s.assignments);
   const createAssignments = useScheduleStore((s) => s.createAssignments);
   const resetAssignmentsForStudent = useScheduleStore((s) => s.resetAssignmentsForStudent);
@@ -59,21 +60,16 @@ export default function ScheduleAssignment() {
     [scheduleComponents]
   );
 
-  // 학생이 이미 배정받은 적 있는 과목만으로 좁힌다. 아직 배정 이력이 없는 학생(첫 배정)이면
+  // 학생 관리 화면에서 등록한 과목만으로 좁힌다. 아직 등록된 과목이 없는 학생(첫 배정)이면
   // 좁힐 기준이 없으므로 전체 과목을 보여준다.
   const subjectsForStudentId = useCallback(
     (sid: string) => {
-      const subjectIds = new Set<string>();
-      for (const a of assignments) {
-        if (a.studentId !== sid) continue;
-        const component = componentById.get(a.scheduleComponentId);
-        const item = component ? itemById.get(component.scheduleItemId) : undefined;
-        const curriculum = item ? curriculumById.get(item.curriculumId) : undefined;
-        if (curriculum) subjectIds.add(curriculum.subjectId);
-      }
+      const subjectIds = new Set(
+        studentSubjects.filter((ss) => ss.studentId === sid).map((ss) => ss.subjectId)
+      );
       return subjectIds.size > 0 ? subjects.filter((s) => subjectIds.has(s.id)) : subjects;
     },
-    [assignments, subjects, componentById, itemById, curriculumById]
+    [studentSubjects, subjects]
   );
 
   const subjectsForStudent = useMemo(

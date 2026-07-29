@@ -56,6 +56,13 @@ export interface Student {
   name: string;
 }
 
+/** 학생이 실제로 듣는 과목 — 배정 기록과 별개로 명시적으로 등록/해제한다. */
+export interface StudentSubject {
+  id: string;
+  studentId: string;
+  subjectId: string;
+}
+
 export interface Assignment {
   id: string;
   studentId: string;

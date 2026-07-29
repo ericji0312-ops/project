@@ -6,6 +6,7 @@ import type {
   ScheduleItem,
   ScheduleComponent,
   Student,
+  StudentSubject,
   Assignment,
 } from "@/types/schedule";
 
@@ -50,6 +51,14 @@ function mapScheduleComponent(row: {
   };
 }
 
+function mapStudentSubject(row: {
+  id: string;
+  student_id: string;
+  subject_id: string;
+}): StudentSubject {
+  return { id: row.id, studentId: row.student_id, subjectId: row.subject_id };
+}
+
 function mapAssignment(row: {
   id: string;
   student_id: string;
@@ -76,12 +85,15 @@ interface ScheduleStore {
   scheduleItems: ScheduleItem[];
   scheduleComponents: ScheduleComponent[];
   students: Student[];
+  studentSubjects: StudentSubject[];
   assignments: Assignment[];
 
   fetchAll: () => Promise<void>;
   addSubject: (name: string) => Promise<Subject>;
   addStudent: (name: string) => Promise<Student>;
   deleteStudent: (studentId: string) => Promise<void>;
+  addStudentSubject: (studentId: string, subjectId: string) => Promise<void>;
+  removeStudentSubject: (studentSubjectId: string) => Promise<void>;
   addCurriculum: (
     curriculum: Omit<Curriculum, "id">,
     items: ScheduleItem[],
@@ -110,21 +122,30 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
   scheduleItems: [],
   scheduleComponents: [],
   students: [],
+  studentSubjects: [],
   assignments: [],
 
   fetchAll: async () => {
     if (get().loading) return;
     set({ loading: true, error: null });
 
-    const [subjectsRes, curriculaRes, itemsRes, componentsRes, studentsRes, assignmentsRes] =
-      await Promise.all([
-        supabase.from("subjects").select("*"),
-        supabase.from("curricula").select("*"),
-        supabase.from("schedule_items").select("*"),
-        supabase.from("schedule_components").select("*"),
-        supabase.from("students").select("*"),
-        supabase.from("assignments").select("*"),
-      ]);
+    const [
+      subjectsRes,
+      curriculaRes,
+      itemsRes,
+      componentsRes,
+      studentsRes,
+      studentSubjectsRes,
+      assignmentsRes,
+    ] = await Promise.all([
+      supabase.from("subjects").select("*"),
+      supabase.from("curricula").select("*"),
+      supabase.from("schedule_items").select("*"),
+      supabase.from("schedule_components").select("*"),
+      supabase.from("students").select("*"),
+      supabase.from("student_subjects").select("*"),
+      supabase.from("assignments").select("*"),
+    ]);
 
     const firstError =
       subjectsRes.error ||
@@ -132,6 +153,7 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       itemsRes.error ||
       componentsRes.error ||
       studentsRes.error ||
+      studentSubjectsRes.error ||
       assignmentsRes.error;
 
     if (firstError) {
@@ -145,6 +167,7 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       scheduleItems: (itemsRes.data ?? []).map(mapScheduleItem),
       scheduleComponents: (componentsRes.data ?? []).map(mapScheduleComponent),
       students: studentsRes.data ?? [],
+      studentSubjects: (studentSubjectsRes.data ?? []).map(mapStudentSubject),
       assignments: (assignmentsRes.data ?? []).map(mapAssignment),
       initialized: true,
       loading: false,
@@ -178,8 +201,33 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
 
     set((state) => ({
       students: state.students.filter((s) => s.id !== studentId),
-      // 학생 삭제 시 배정 기록도 FK cascade로 DB에서 함께 삭제되므로 로컬 state도 맞춘다.
+      // 학생 삭제 시 배정 기록/과목 등록도 FK cascade로 DB에서 함께 삭제되므로 로컬 state도 맞춘다.
+      studentSubjects: state.studentSubjects.filter((ss) => ss.studentId !== studentId),
       assignments: state.assignments.filter((a) => a.studentId !== studentId),
+    }));
+  },
+
+  addStudentSubject: async (studentId, subjectId) => {
+    const { data, error } = await supabase
+      .from("student_subjects")
+      .insert({ student_id: studentId, subject_id: subjectId })
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+
+    const studentSubject = mapStudentSubject(data);
+    set((state) => ({ studentSubjects: [...state.studentSubjects, studentSubject] }));
+  },
+
+  removeStudentSubject: async (studentSubjectId) => {
+    const { error } = await supabase
+      .from("student_subjects")
+      .delete()
+      .eq("id", studentSubjectId);
+    if (error) throw new Error(error.message);
+
+    set((state) => ({
+      studentSubjects: state.studentSubjects.filter((ss) => ss.id !== studentSubjectId),
     }));
   },
 
