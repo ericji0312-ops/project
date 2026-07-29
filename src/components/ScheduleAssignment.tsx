@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useScheduleStore } from "@/lib/store";
 import { generateCopyText, type AssignedLine } from "@/lib/textGenerator";
@@ -52,13 +52,42 @@ export default function ScheduleAssignment() {
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const itemById = useMemo(() => new Map(scheduleItems.map((i) => [i.id, i])), [scheduleItems]);
+  const curriculumById = useMemo(() => new Map(curricula.map((c) => [c.id, c])), [curricula]);
+  const componentById = useMemo(
+    () => new Map(scheduleComponents.map((c) => [c.id, c])),
+    [scheduleComponents]
+  );
+
+  // 학생이 이미 배정받은 적 있는 과목만으로 좁힌다. 아직 배정 이력이 없는 학생(첫 배정)이면
+  // 좁힐 기준이 없으므로 전체 과목을 보여준다.
+  const subjectsForStudentId = useCallback(
+    (sid: string) => {
+      const subjectIds = new Set<string>();
+      for (const a of assignments) {
+        if (a.studentId !== sid) continue;
+        const component = componentById.get(a.scheduleComponentId);
+        const item = component ? itemById.get(component.scheduleItemId) : undefined;
+        const curriculum = item ? curriculumById.get(item.curriculumId) : undefined;
+        if (curriculum) subjectIds.add(curriculum.subjectId);
+      }
+      return subjectIds.size > 0 ? subjects.filter((s) => subjectIds.has(s.id)) : subjects;
+    },
+    [assignments, subjects, componentById, itemById, curriculumById]
+  );
+
+  const subjectsForStudent = useMemo(
+    () => subjectsForStudentId(studentId),
+    [subjectsForStudentId, studentId]
+  );
+
   useEffect(() => {
     if (!studentId && students.length > 0) setStudentId(students[0].id);
   }, [students, studentId]);
 
   useEffect(() => {
-    if (!subjectId && subjects.length > 0) setSubjectId(subjects[0].id);
-  }, [subjects, subjectId]);
+    if (!subjectId && subjectsForStudent.length > 0) setSubjectId(subjectsForStudent[0].id);
+  }, [subjectsForStudent, subjectId]);
 
   useEffect(() => {
     if (!curriculumId && subjectId) {
@@ -118,13 +147,6 @@ export default function ScheduleAssignment() {
     return list;
   }, [itemsForCurriculum, componentsByItemId, columns, curriculum]);
 
-  const itemById = useMemo(() => new Map(scheduleItems.map((i) => [i.id, i])), [scheduleItems]);
-  const curriculumById = useMemo(() => new Map(curricula.map((c) => [c.id, c])), [curricula]);
-  const componentById = useMemo(
-    () => new Map(scheduleComponents.map((c) => [c.id, c])),
-    [scheduleComponents]
-  );
-
   const currentAssignmentLines: AssignedLine[] = useMemo(() => {
     return assignments
       .filter((a) => a.studentId === studentId)
@@ -162,6 +184,14 @@ export default function ScheduleAssignment() {
 
   function handleStudentChange(newStudentId: string) {
     setStudentId(newStudentId);
+
+    const filteredSubjects = subjectsForStudentId(newStudentId);
+    const newSubjectId = filteredSubjects[0]?.id ?? "";
+    setSubjectId(newSubjectId);
+
+    const firstCurriculum = curricula.find((c) => c.subjectId === newSubjectId);
+    setCurriculumId(firstCurriculum?.id ?? "");
+
     setSelectedIds(new Set());
     setManualDates({});
   }
@@ -268,8 +298,8 @@ export default function ScheduleAssignment() {
             value={subjectId}
             onChange={(e) => handleSubjectChange(e.target.value)}
           >
-            {subjects.length === 0 && <option value="">과목 없음</option>}
-            {subjects.map((s) => (
+            {subjectsForStudent.length === 0 && <option value="">과목 없음</option>}
+            {subjectsForStudent.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
