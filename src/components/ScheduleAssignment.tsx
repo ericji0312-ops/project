@@ -351,7 +351,7 @@ export default function ScheduleAssignment() {
                                     checked={isSelected}
                                     onChange={() => toggleComponent(c.id)}
                                   />
-                                  <span className="line-clamp-2">
+                                  <span>
                                     {c.content}
                                     {isAssigned && (
                                       <span className="ml-1 text-xs text-gray-500">(배정됨)</span>
