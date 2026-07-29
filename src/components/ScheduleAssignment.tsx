@@ -331,11 +331,16 @@ export default function ScheduleAssignment() {
                           <div className="flex flex-col gap-1">
                             {cellComponents.map((c) => {
                               const isAssigned = assignedComponentIds.has(c.id);
+                              const isSelected = selectedIds.has(c.id);
                               return (
                                 <label
                                   key={c.id}
-                                  className={`flex items-start gap-1 ${
-                                    isAssigned ? "opacity-40" : "cursor-pointer"
+                                  className={`flex items-start gap-1 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors duration-150 ${
+                                    isAssigned
+                                      ? "opacity-40"
+                                      : isSelected
+                                        ? "cursor-pointer bg-blue-50 dark:bg-blue-950"
+                                        : "cursor-pointer"
                                   }`}
                                   title={c.content}
                                 >
@@ -343,7 +348,7 @@ export default function ScheduleAssignment() {
                                     type="checkbox"
                                     className="mt-0.5"
                                     disabled={isAssigned}
-                                    checked={selectedIds.has(c.id)}
+                                    checked={isSelected}
                                     onChange={() => toggleComponent(c.id)}
                                   />
                                   <span className="line-clamp-2">
