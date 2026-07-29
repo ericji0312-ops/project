@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const LINKS = [
+const BASE_LINKS = [
   { href: "/", label: "배정화면" },
   { href: "/upload", label: "엑셀 업로드" },
   { href: "/students", label: "학생 관리" },
 ];
 
-export default function NavLinks() {
+const ADMIN_LINKS = [{ href: "/teachers", label: "선생님 관리" }];
+
+export default function NavLinks({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname();
+  const links = isAdmin ? [...BASE_LINKS, ...ADMIN_LINKS] : BASE_LINKS;
 
   return (
     <div className="flex gap-1">
-      {LINKS.map(({ href, label }) => {
+      {links.map(({ href, label }) => {
         const active = pathname === href;
         return (
           <Link

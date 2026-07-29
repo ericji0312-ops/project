@@ -11,8 +11,19 @@ if (!secretKey) {
 }
 const encodedKey = new TextEncoder().encode(secretKey);
 
+export type SessionRole = "admin" | "teacher";
+
 interface SessionPayload extends JWTPayload {
   authenticated: boolean;
+  role: SessionRole;
+  teacherId?: string;
+  teacherName?: string;
+}
+
+export interface CreateSessionInput {
+  role: SessionRole;
+  teacherId?: string;
+  teacherName?: string;
 }
 
 async function encrypt(payload: SessionPayload) {
@@ -35,9 +46,14 @@ export async function decrypt(token?: string): Promise<SessionPayload | null> {
   }
 }
 
-export async function createSession() {
+export async function createSession(input: CreateSessionInput) {
   const expiresAt = new Date(Date.now() + SESSION_DURATION_MS);
-  const session = await encrypt({ authenticated: true });
+  const session = await encrypt({
+    authenticated: true,
+    role: input.role,
+    teacherId: input.teacherId,
+    teacherName: input.teacherName,
+  });
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, session, {
     httpOnly: true,
@@ -53,8 +69,21 @@ export async function deleteSession() {
   cookieStore.delete(SESSION_COOKIE);
 }
 
-export async function isAuthenticated(): Promise<boolean> {
+export interface CurrentSession {
+  role: SessionRole;
+  teacherId?: string;
+  teacherName?: string;
+}
+
+export async function getSession(): Promise<CurrentSession | null> {
   const cookieStore = await cookies();
   const session = await decrypt(cookieStore.get(SESSION_COOKIE)?.value);
-  return Boolean(session?.authenticated);
+  if (!session?.authenticated) return null;
+  return {
+    // 이 기능 배포 전에 발급된 세션 쿠키는 role이 없다 — 그때는 공유 비밀번호 로그인만
+    // 존재했으므로 관리자로 취급한다 (재로그인 강제 없이 하위 호환).
+    role: session.role ?? "admin",
+    teacherId: session.teacherId,
+    teacherName: session.teacherName,
+  };
 }

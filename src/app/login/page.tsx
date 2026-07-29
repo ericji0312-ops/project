@@ -15,7 +15,7 @@ export default function LoginPage() {
         <input
           type="password"
           name="password"
-          placeholder="공유 비밀번호"
+          placeholder="비밀번호"
           className="border rounded px-2 py-1 w-full"
           autoFocus
           required

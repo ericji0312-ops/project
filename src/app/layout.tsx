@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { isAuthenticated } from "@/lib/session";
+import { getSession } from "@/lib/session";
 import LogoutButton from "@/components/LogoutButton";
 import NavLinks from "@/components/NavLinks";
 import "./globals.css";
@@ -25,7 +25,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const authenticated = await isAuthenticated();
+  const session = await getSession();
 
   return (
     <html
@@ -33,10 +33,15 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        {authenticated && (
+        {session && (
           <nav className="flex items-center justify-between gap-4 border-b px-6 py-3 text-sm font-medium">
-            <NavLinks />
-            <LogoutButton />
+            <NavLinks isAdmin={session.role === "admin"} />
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-500">
+                {session.role === "admin" ? "관리자" : `${session.teacherName} 선생님`}
+              </span>
+              <LogoutButton />
+            </div>
           </nav>
         )}
         {children}

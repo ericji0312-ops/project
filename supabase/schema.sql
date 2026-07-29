@@ -83,3 +83,18 @@ join schedule_components sc on sc.id = a.schedule_component_id
 join schedule_items si on si.id = sc.schedule_item_id
 join curricula c on c.id = si.curriculum_id
 on conflict (student_id, subject_id) do nothing;
+
+-- ============================================================
+-- 마이그레이션 (2026-07-29): 선생님별 로그인 (개인 비밀번호로 구분)
+-- Supabase 대시보드 > SQL Editor 에서 아래 블록만 실행하면 됨.
+-- password_hash는 scrypt(salt:hash 형태의 hex 문자열)로만 저장하고, 평문은
+-- 발급/재발급 시 서버 액션 응답으로 딱 한 번만 노출한다 (DB에는 절대 평문 저장 안 함).
+-- 이 테이블은 anon key로 클라이언트에서 직접 select 하지 않는다(Server Action 경유 전용).
+-- ============================================================
+
+create table teachers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  password_hash text not null,
+  created_at timestamptz not null default now()
+);
