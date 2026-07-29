@@ -110,6 +110,7 @@ interface ScheduleStore {
     lines: { studentId: string; scheduleComponentId: string; deadlineDate: string }[]
   ) => Promise<void>;
   resetAssignmentsForStudent: (studentId: string) => Promise<void>;
+  deleteAssignment: (assignmentId: string) => Promise<void>;
 }
 
 export const useScheduleStore = create<ScheduleStore>((set, get) => ({
@@ -376,6 +377,15 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
 
     set((state) => ({
       assignments: state.assignments.filter((a) => a.studentId !== studentId),
+    }));
+  },
+
+  deleteAssignment: async (assignmentId) => {
+    const { error } = await supabase.from("assignments").delete().eq("id", assignmentId);
+    if (error) throw new Error(error.message);
+
+    set((state) => ({
+      assignments: state.assignments.filter((a) => a.id !== assignmentId),
     }));
   },
 }));

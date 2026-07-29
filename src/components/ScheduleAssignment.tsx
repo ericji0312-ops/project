@@ -35,6 +35,7 @@ export default function ScheduleAssignment() {
   const assignments = useScheduleStore((s) => s.assignments);
   const createAssignments = useScheduleStore((s) => s.createAssignments);
   const resetAssignmentsForStudent = useScheduleStore((s) => s.resetAssignmentsForStudent);
+  const deleteAssignment = useScheduleStore((s) => s.deleteAssignment);
 
   useEffect(() => {
     if (!initialized) fetchAll();
@@ -52,6 +53,7 @@ export default function ScheduleAssignment() {
   const [manualDates, setManualDates] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [cancelingAssignmentId, setCancelingAssignmentId] = useState<string | null>(null);
 
   const itemById = useMemo(() => new Map(scheduleItems.map((i) => [i.id, i])), [scheduleItems]);
   const curriculumById = useMemo(() => new Map(curricula.map((c) => [c.id, c])), [curricula]);
@@ -161,6 +163,14 @@ export default function ScheduleAssignment() {
     [currentAssignmentLines]
   );
 
+  const assignmentIdByComponentId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const a of assignments) {
+      if (a.studentId === studentId) map.set(a.scheduleComponentId, a.id);
+    }
+    return map;
+  }, [assignments, studentId]);
+
   function toggleComponent(id: string) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -168,6 +178,18 @@ export default function ScheduleAssignment() {
       else next.add(id);
       return next;
     });
+  }
+
+  async function handleCancelAssignment(assignmentId: string) {
+    setActionError(null);
+    setCancelingAssignmentId(assignmentId);
+    try {
+      await deleteAssignment(assignmentId);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCancelingAssignmentId(null);
+    }
   }
 
   function handleSubjectChange(newSubjectId: string) {
@@ -358,29 +380,42 @@ export default function ScheduleAssignment() {
                             {cellComponents.map((c) => {
                               const isAssigned = assignedComponentIds.has(c.id);
                               const isSelected = selectedIds.has(c.id);
+                              const assignmentId = assignmentIdByComponentId.get(c.id);
+                              const isCanceling =
+                                isAssigned && assignmentId !== undefined && cancelingAssignmentId === assignmentId;
                               return (
                                 <label
                                   key={c.id}
                                   className={`flex items-start gap-1 rounded px-1 py-0.5 -mx-1 -my-0.5 transition-colors duration-150 ${
-                                    isAssigned
-                                      ? "opacity-40"
-                                      : isSelected
-                                        ? "cursor-pointer bg-blue-50 dark:bg-blue-950"
-                                        : "cursor-pointer"
+                                    isCanceling
+                                      ? "opacity-30"
+                                      : isAssigned
+                                        ? "cursor-pointer opacity-60 hover:opacity-90 hover:bg-red-50 dark:hover:bg-red-950"
+                                        : isSelected
+                                          ? "cursor-pointer bg-blue-50 dark:bg-blue-950"
+                                          : "cursor-pointer"
                                   }`}
-                                  title={c.content}
+                                  title={isAssigned ? `${c.content} (클릭하면 배정 취소)` : c.content}
                                 >
                                   <input
                                     type="checkbox"
                                     className="mt-0.5"
-                                    disabled={isAssigned}
-                                    checked={isSelected}
-                                    onChange={() => toggleComponent(c.id)}
+                                    disabled={isCanceling}
+                                    checked={isAssigned || isSelected}
+                                    onChange={() => {
+                                      if (isAssigned) {
+                                        if (assignmentId) handleCancelAssignment(assignmentId);
+                                      } else {
+                                        toggleComponent(c.id);
+                                      }
+                                    }}
                                   />
                                   <span>
                                     {c.content}
                                     {isAssigned && (
-                                      <span className="ml-1 text-xs text-gray-500">(배정됨)</span>
+                                      <span className="ml-1 text-xs text-gray-500">
+                                        {isCanceling ? "(취소 중...)" : "(배정됨 · 클릭해서 취소)"}
+                                      </span>
                                     )}
                                   </span>
                                 </label>
