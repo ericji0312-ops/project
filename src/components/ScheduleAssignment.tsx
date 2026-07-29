@@ -252,7 +252,10 @@ export default function ScheduleAssignment() {
             ))}
           </select>
           {students.length === 0 && (
-            <Link href="/students" className="text-xs text-blue-600 underline">
+            <Link
+              href="/students"
+              className="text-xs text-blue-600 underline transition-colors hover:text-blue-800"
+            >
               학생 관리에서 추가
             </Link>
           )}
@@ -440,7 +443,7 @@ export default function ScheduleAssignment() {
         )}
 
         <button
-          className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-40"
+          className="bg-blue-600 text-white rounded px-4 py-2 transition-colors duration-150 hover:bg-blue-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-blue-600 disabled:hover:shadow-none"
           disabled={selectedIds.size === 0 || submitting}
           onClick={handleAssign}
         >
@@ -453,14 +456,14 @@ export default function ScheduleAssignment() {
           <h2 className="font-semibold">복사용 텍스트</h2>
           <div className="flex gap-2">
             <button
-              className="text-xs border rounded px-2 py-1 disabled:opacity-40"
+              className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:shadow-none"
               onClick={handleResetAssignments}
               disabled={currentAssignmentLines.length === 0 || submitting}
             >
               배정 초기화
             </button>
             <button
-              className="text-xs bg-gray-800 text-white rounded px-2 py-1 disabled:opacity-40"
+              className="text-xs bg-gray-800 text-white rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-900 hover:shadow-md disabled:opacity-40 disabled:hover:bg-gray-800 disabled:hover:shadow-none"
               onClick={handleCopy}
               disabled={!copyText}
             >

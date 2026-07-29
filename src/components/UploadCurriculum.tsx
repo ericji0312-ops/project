@@ -174,7 +174,8 @@ export default function UploadCurriculum() {
           className="block w-full text-gray-700 dark:text-gray-300 cursor-pointer
             file:mr-4 file:cursor-pointer file:rounded file:border-0
             file:bg-blue-600 file:px-4 file:py-2 file:font-medium file:text-white
-            hover:file:bg-blue-700"
+            file:transition-colors file:duration-150
+            hover:file:bg-blue-700 hover:file:shadow-md"
         />
         {fileName && <p className="mt-2 text-gray-500">선택된 파일: {fileName}</p>}
         {error && <p className="mt-2 text-red-600">{error}</p>}
@@ -292,7 +293,9 @@ export default function UploadCurriculum() {
 
             {data.warnings.length > 0 && (
               <details>
-                <summary className="cursor-pointer text-amber-700">경고 내용 보기</summary>
+                <summary className="cursor-pointer text-amber-700 transition-colors hover:text-amber-900">
+                  경고 내용 보기
+                </summary>
                 <ul className="list-disc pl-5 text-xs text-gray-600 dark:text-gray-400">
                   {data.warnings.map((w, i) => (
                     <li key={i}>{w}</li>
@@ -319,7 +322,7 @@ export default function UploadCurriculum() {
             </div>
 
             <button
-              className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-40"
+              className="bg-blue-600 text-white rounded px-4 py-2 transition-colors duration-150 hover:bg-blue-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-blue-600 disabled:hover:shadow-none"
               disabled={
                 config.loaded || loadingSheet === sheetName || (Boolean(matched) && newOrderCount === 0)
               }
@@ -372,14 +375,14 @@ export default function UploadCurriculum() {
                       정말 삭제할까요? (회차/구성요소/관련 배정 기록 모두 삭제됨)
                     </span>
                     <button
-                      className="text-xs bg-red-600 text-white rounded px-2 py-1 disabled:opacity-40"
+                      className="text-xs bg-red-600 text-white rounded px-2 py-1 transition-colors duration-150 hover:bg-red-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-red-600 disabled:hover:shadow-none"
                       disabled={deleting}
                       onClick={() => handleDeleteCurriculum(c.id)}
                     >
                       확인
                     </button>
                     <button
-                      className="text-xs border rounded px-2 py-1"
+                      className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800"
                       disabled={deleting}
                       onClick={() => setPendingDeleteId(null)}
                     >
@@ -388,7 +391,7 @@ export default function UploadCurriculum() {
                   </div>
                 ) : (
                   <button
-                    className="text-xs text-gray-500 hover:text-red-600"
+                    className="text-xs text-gray-500 transition-colors hover:text-red-600"
                     onClick={() => setPendingDeleteId(c.id)}
                   >
                     삭제

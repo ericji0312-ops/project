@@ -20,10 +20,10 @@ export default function NavLinks() {
           <Link
             key={href}
             href={href}
-            className={`rounded-full px-3 py-1.5 transition-colors ${
+            className={`rounded-full px-3 py-1.5 transition-colors duration-150 ${
               active
-                ? "bg-blue-600 text-white"
-                : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-neutral-800"
+                ? "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md"
+                : "text-gray-700 hover:bg-gray-100 hover:shadow-sm dark:text-gray-300 dark:hover:bg-neutral-800"
             }`}
           >
             {label}

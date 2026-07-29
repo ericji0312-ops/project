@@ -86,7 +86,7 @@ export default function StudentManagement() {
           />
         </label>
         <button
-          className="bg-blue-600 text-white rounded px-4 py-2 disabled:opacity-40"
+          className="bg-blue-600 text-white rounded px-4 py-2 transition-colors duration-150 hover:bg-blue-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-blue-600 disabled:hover:shadow-none"
           onClick={handleAdd}
           disabled={busy || !newName.trim()}
         >
@@ -114,14 +114,14 @@ export default function StudentManagement() {
                     정말 삭제할까요? {count > 0 && `(배정 기록 ${count}건도 함께 삭제됨)`}
                   </span>
                   <button
-                    className="text-xs bg-red-600 text-white rounded px-2 py-1 disabled:opacity-40"
+                    className="text-xs bg-red-600 text-white rounded px-2 py-1 transition-colors duration-150 hover:bg-red-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-red-600 disabled:hover:shadow-none"
                     disabled={busy}
                     onClick={() => handleConfirmDelete(s.id)}
                   >
                     확인
                   </button>
                   <button
-                    className="text-xs border rounded px-2 py-1"
+                    className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800"
                     disabled={busy}
                     onClick={() => setPendingDeleteId(null)}
                   >
@@ -130,7 +130,7 @@ export default function StudentManagement() {
                 </div>
               ) : (
                 <button
-                  className="text-xs text-gray-500 hover:text-red-600"
+                  className="text-xs text-gray-500 transition-colors hover:text-red-600"
                   onClick={() => setPendingDeleteId(s.id)}
                 >
                   삭제

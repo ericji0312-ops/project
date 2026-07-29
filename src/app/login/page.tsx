@@ -24,7 +24,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={pending}
-          className="bg-blue-600 text-white rounded px-4 py-2 w-full disabled:opacity-40"
+          className="bg-blue-600 text-white rounded px-4 py-2 w-full transition-colors duration-150 hover:bg-blue-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-blue-600 disabled:hover:shadow-none"
         >
           {pending ? "확인 중..." : "로그인"}
         </button>
