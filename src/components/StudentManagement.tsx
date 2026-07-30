@@ -124,7 +124,7 @@ export default function StudentManagement() {
             onKeyDown={(e) => {
               if (e.key === "Enter") handleAdd();
             }}
-            placeholder="예: 김하은"
+            placeholder="예: 임민영"
           />
         </label>
         <button
