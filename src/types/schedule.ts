@@ -54,6 +54,8 @@ export interface ScheduleComponent {
 export interface Student {
   id: string;
   name: string;
+  /** 담당 선생님 id. 아직 배정되지 않았으면 null. */
+  teacherId: string | null;
 }
 
 /** 학생이 실제로 듣는 과목 — 배정 기록과 별개로 명시적으로 등록/해제한다. */

@@ -17,6 +17,22 @@ async function requireAdmin() {
   }
 }
 
+export interface TeacherBasic {
+  id: string;
+  name: string;
+}
+
+/** 학생 관리 화면의 "담당 선생님" 선택용 — 비밀번호 등 민감 정보 없이 id/name만 노출. */
+export async function listTeachersBasic(): Promise<TeacherBasic[]> {
+  const session = await getSession();
+  if (!session) throw new Error("로그인이 필요합니다.");
+
+  const { data, error } = await supabase.from("teachers").select("id, name").order("name");
+  if (error) throw new Error(error.message);
+
+  return data ?? [];
+}
+
 export async function listTeachers(): Promise<TeacherSummary[]> {
   await requireAdmin();
 

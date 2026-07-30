@@ -51,6 +51,10 @@ function mapScheduleComponent(row: {
   };
 }
 
+function mapStudent(row: { id: string; name: string; teacher_id: string | null }): Student {
+  return { id: row.id, name: row.name, teacherId: row.teacher_id };
+}
+
 function mapStudentSubject(row: {
   id: string;
   student_id: string;
@@ -92,6 +96,7 @@ interface ScheduleStore {
   addSubject: (name: string) => Promise<Subject>;
   addStudent: (name: string) => Promise<Student>;
   deleteStudent: (studentId: string) => Promise<void>;
+  setStudentTeacher: (studentId: string, teacherId: string | null) => Promise<void>;
   addStudentSubject: (studentId: string, subjectId: string) => Promise<void>;
   removeStudentSubject: (studentSubjectId: string) => Promise<void>;
   addCurriculum: (
@@ -167,7 +172,7 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       curricula: (curriculaRes.data ?? []).map(mapCurriculum),
       scheduleItems: (itemsRes.data ?? []).map(mapScheduleItem),
       scheduleComponents: (componentsRes.data ?? []).map(mapScheduleComponent),
-      students: studentsRes.data ?? [],
+      students: (studentsRes.data ?? []).map(mapStudent),
       studentSubjects: (studentSubjectsRes.data ?? []).map(mapStudentSubject),
       assignments: (assignmentsRes.data ?? []).map(mapAssignment),
       initialized: true,
@@ -191,7 +196,7 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
     const { data, error } = await supabase.from("students").insert({ name }).select().single();
     if (error) throw new Error(error.message);
 
-    const student: Student = data;
+    const student = mapStudent(data);
     set((state) => ({ students: [...state.students, student] }));
     return student;
   },
@@ -205,6 +210,18 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       // 학생 삭제 시 배정 기록/과목 등록도 FK cascade로 DB에서 함께 삭제되므로 로컬 state도 맞춘다.
       studentSubjects: state.studentSubjects.filter((ss) => ss.studentId !== studentId),
       assignments: state.assignments.filter((a) => a.studentId !== studentId),
+    }));
+  },
+
+  setStudentTeacher: async (studentId, teacherId) => {
+    const { error } = await supabase
+      .from("students")
+      .update({ teacher_id: teacherId })
+      .eq("id", studentId);
+    if (error) throw new Error(error.message);
+
+    set((state) => ({
+      students: state.students.map((s) => (s.id === studentId ? { ...s, teacherId } : s)),
     }));
   },
 

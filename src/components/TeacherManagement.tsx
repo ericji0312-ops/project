@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   listTeachers,
   createTeacher,
@@ -8,10 +8,31 @@ import {
   deleteTeacher,
   type TeacherSummary,
 } from "@/app/actions/teachers";
+import { useScheduleStore } from "@/lib/store";
 
 export default function TeacherManagement() {
   const [teachers, setTeachers] = useState<TeacherSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const studentsInitialized = useScheduleStore((s) => s.initialized);
+  const fetchStudents = useScheduleStore((s) => s.fetchAll);
+  const students = useScheduleStore((s) => s.students);
+
+  useEffect(() => {
+    if (!studentsInitialized) fetchStudents();
+  }, [studentsInitialized, fetchStudents]);
+
+  const studentsByTeacherId = useMemo(() => {
+    const map = new Map<string, typeof students>();
+    for (const s of students) {
+      if (!s.teacherId) continue;
+      if (!map.has(s.teacherId)) map.set(s.teacherId, []);
+      map.get(s.teacherId)!.push(s);
+    }
+    return map;
+  }, [students]);
+
+  const [expandedTeacherId, setExpandedTeacherId] = useState<string | null>(null);
 
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -141,43 +162,74 @@ export default function TeacherManagement() {
         )}
         {teachers.map((t) => {
           const isPending = pendingDeleteId === t.id;
+          const isExpanded = expandedTeacherId === t.id;
+          const assignedStudents = studentsByTeacherId.get(t.id) ?? [];
           return (
-            <div key={t.id} className="border rounded p-3 flex items-center justify-between">
-              <span className="font-medium">{t.name}</span>
+            <div key={t.id} className="border rounded p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <button
+                  className="font-medium text-left transition-colors hover:text-blue-600"
+                  onClick={() => setExpandedTeacherId(isExpanded ? null : t.id)}
+                >
+                  {t.name}
+                  <span className="ml-2 text-xs text-gray-500">
+                    학생 {assignedStudents.length}명
+                  </span>
+                </button>
 
-              {isPending ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-red-600">정말 삭제할까요?</span>
-                  <button
-                    className="text-xs bg-red-600 text-white rounded px-2 py-1 transition-colors duration-150 hover:bg-red-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-red-600 disabled:hover:shadow-none"
-                    disabled={busy}
-                    onClick={() => handleConfirmDelete(t.id)}
-                  >
-                    확인
-                  </button>
-                  <button
-                    className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800"
-                    disabled={busy}
-                    onClick={() => setPendingDeleteId(null)}
-                  >
-                    취소
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <button
-                    className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800 disabled:opacity-40"
-                    disabled={busy}
-                    onClick={() => handleRegenerate(t.id, t.name)}
-                  >
-                    비밀번호 재발급
-                  </button>
-                  <button
-                    className="text-xs text-gray-500 transition-colors hover:text-red-600"
-                    onClick={() => setPendingDeleteId(t.id)}
-                  >
-                    삭제
-                  </button>
+                {isPending ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-red-600">정말 삭제할까요?</span>
+                    <button
+                      className="text-xs bg-red-600 text-white rounded px-2 py-1 transition-colors duration-150 hover:bg-red-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-red-600 disabled:hover:shadow-none"
+                      disabled={busy}
+                      onClick={() => handleConfirmDelete(t.id)}
+                    >
+                      확인
+                    </button>
+                    <button
+                      className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800"
+                      disabled={busy}
+                      onClick={() => setPendingDeleteId(null)}
+                    >
+                      취소
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3">
+                    <button
+                      className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800 disabled:opacity-40"
+                      disabled={busy}
+                      onClick={() => handleRegenerate(t.id, t.name)}
+                    >
+                      비밀번호 재발급
+                    </button>
+                    <button
+                      className="text-xs text-gray-500 transition-colors hover:text-red-600"
+                      onClick={() => setPendingDeleteId(t.id)}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {isExpanded && (
+                <div className="border-t pt-2 text-xs">
+                  {assignedStudents.length === 0 ? (
+                    <p className="text-gray-500">배정된 학생이 없습니다.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {assignedStudents.map((s) => (
+                        <span
+                          key={s.id}
+                          className="rounded-full bg-gray-100 dark:bg-neutral-800 px-2 py-0.5"
+                        >
+                          {s.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

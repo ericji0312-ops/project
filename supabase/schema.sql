@@ -98,3 +98,13 @@ create table teachers (
   password_hash text not null,
   created_at timestamptz not null default now()
 );
+
+-- ============================================================
+-- 마이그레이션 (2026-07-31): 학생별 담당 선생님 지정
+-- Supabase 대시보드 > SQL Editor 에서 아래 블록만 실행하면 됨.
+-- ============================================================
+
+alter table students
+  add column teacher_id uuid references teachers(id) on delete set null;
+
+create index on students (teacher_id);

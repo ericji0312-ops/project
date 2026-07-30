@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useScheduleStore } from "@/lib/store";
+import { listTeachersBasic, type TeacherBasic } from "@/app/actions/teachers";
 
 export default function StudentManagement() {
   const initialized = useScheduleStore((s) => s.initialized);
@@ -16,10 +17,18 @@ export default function StudentManagement() {
   const deleteStudent = useScheduleStore((s) => s.deleteStudent);
   const addStudentSubject = useScheduleStore((s) => s.addStudentSubject);
   const removeStudentSubject = useScheduleStore((s) => s.removeStudentSubject);
+  const setStudentTeacher = useScheduleStore((s) => s.setStudentTeacher);
 
   useEffect(() => {
     if (!initialized) fetchAll();
   }, [initialized, fetchAll]);
+
+  const [teachers, setTeachers] = useState<TeacherBasic[]>([]);
+  useEffect(() => {
+    listTeachersBasic()
+      .then(setTeachers)
+      .catch(() => setTeachers([]));
+  }, []);
 
   const [newName, setNewName] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -27,6 +36,7 @@ export default function StudentManagement() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [subjectToAddByStudent, setSubjectToAddByStudent] = useState<Record<string, string>>({});
   const [subjectBusyByStudent, setSubjectBusyByStudent] = useState<Record<string, boolean>>({});
+  const [teacherBusyByStudent, setTeacherBusyByStudent] = useState<Record<string, boolean>>({});
 
   const assignmentCountByStudent = useMemo(() => {
     const map = new Map<string, number>();
@@ -100,6 +110,18 @@ export default function StudentManagement() {
     }
   }
 
+  async function handleTeacherChange(studentId: string, teacherId: string) {
+    setActionError(null);
+    setTeacherBusyByStudent((prev) => ({ ...prev, [studentId]: true }));
+    try {
+      await setStudentTeacher(studentId, teacherId || null);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTeacherBusyByStudent((prev) => ({ ...prev, [studentId]: false }));
+    }
+  }
+
   if (loading && !initialized) {
     return <div className="p-6 text-sm text-gray-500">불러오는 중...</div>;
   }
@@ -151,9 +173,22 @@ export default function StudentManagement() {
           return (
             <div key={s.id} className="border rounded p-3 space-y-2">
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex items-center gap-2">
                   <span className="font-medium">{s.name}</span>
-                  <span className="ml-2 text-xs text-gray-500">배정 {count}건</span>
+                  <span className="text-xs text-gray-500">배정 {count}건</span>
+                  <select
+                    className="border rounded px-1.5 py-0.5 text-xs"
+                    value={s.teacherId ?? ""}
+                    disabled={teacherBusyByStudent[s.id] ?? false}
+                    onChange={(e) => handleTeacherChange(s.id, e.target.value)}
+                  >
+                    <option value="">담당 선생님 없음</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {isPending ? (
