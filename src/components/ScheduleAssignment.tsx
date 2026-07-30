@@ -180,6 +180,22 @@ export default function ScheduleAssignment() {
     });
   }
 
+  // 회차 번호 클릭 시 해당 행의 구성요소 중 RX와 이미 배정된 항목을 제외하고 전체 선택/해제 토글.
+  function toggleRowSelection(itemId: string) {
+    const comps = componentsByItemId.get(itemId) ?? [];
+    const selectable = comps.filter((c) => c.type !== "RX" && !assignedComponentIds.has(c.id));
+    if (selectable.length === 0) return;
+    const allSelected = selectable.every((c) => selectedIds.has(c.id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const c of selectable) {
+        if (allSelected) next.delete(c.id);
+        else next.add(c.id);
+      }
+      return next;
+    });
+  }
+
   async function handleCancelAssignment(assignmentId: string) {
     setActionError(null);
     setCancelingAssignmentId(assignmentId);
@@ -369,7 +385,13 @@ export default function ScheduleAssignment() {
                 const comps = componentsByItemId.get(item.id) ?? [];
                 return (
                   <tr key={item.id}>
-                    <td className="border px-2 py-1 align-top font-medium">{item.order}</td>
+                    <td
+                      className="border px-2 py-1 align-top font-medium cursor-pointer transition-colors duration-150 hover:bg-blue-50 dark:hover:bg-blue-950"
+                      title="클릭하면 RX를 제외한 이 행 전체를 선택/해제합니다"
+                      onClick={() => toggleRowSelection(item.id)}
+                    >
+                      {item.order}
+                    </td>
                     {columns.map((col) => {
                       const cellComponents = curriculum.hasTypedComponents
                         ? comps.filter((c) => c.type === col)
