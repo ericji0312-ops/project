@@ -105,6 +105,6 @@ create table teachers (
 -- ============================================================
 
 alter table students
-  add column teacher_id uuid references teachers(id) on delete set null;
+  add column if not exists teacher_id uuid references teachers(id) on delete set null;
 
-create index on students (teacher_id);
+create index if not exists students_teacher_id_idx on students (teacher_id);
