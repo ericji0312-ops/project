@@ -28,6 +28,7 @@ const TYPE_RULES: { pattern: RegExp; type: string }[] = [
   { pattern: /개념/, type: "개념" },
   { pattern: /라이트쎈/, type: "라이트쎈" },
   { pattern: /쎈/, type: "쎈" },
+  { pattern: /고쟁이/, type: "고쟁이" },
   { pattern: /연산/, type: "연산" },
   { pattern: /RPM/i, type: "RPM" },
 ];
@@ -62,24 +63,14 @@ export function parseRow(order: number, rawCellText: string): ParsedScheduleRow 
   const text = rawCellText.trim();
   if (!text) return null;
 
+  // 대괄호 표기 자체가 없는 파일도 있다(예: "고쟁이 : (1스텝) 1~28번까지 풀기").
+  // 이 경우 커리큘럼명만 못 얻을 뿐, 타입/내용 분리는 대괄호가 있을 때와 동일하게 시도한다.
   const bracketMatch = text.match(BRACKET_RE);
-  if (!bracketMatch) {
-    // 대괄호 표기 자체가 없는 행 — 형식을 벗어난 데이터. 원문 그대로 보존.
-    return {
-      order,
-      rawText: text,
-      curriculumNameInFile: "",
-      typeLabel: null,
-      type: detectType(text),
-      content: text,
-    };
-  }
-
-  const curriculumNameInFile = bracketMatch[1].trim();
-  const rest = bracketMatch[2].trim();
+  const curriculumNameInFile = bracketMatch ? bracketMatch[1].trim() : "";
+  const rest = bracketMatch ? bracketMatch[2].trim() : text;
 
   // "[X]: 내용" — 기출형 (대괄호 바로 뒤 콜론, 타입 라벨 없음)
-  if (rest.startsWith(":")) {
+  if (bracketMatch && rest.startsWith(":")) {
     const content = rest.slice(1).trim();
     return {
       order,
@@ -91,7 +82,7 @@ export function parseRow(order: number, rawCellText: string): ParsedScheduleRow 
     };
   }
 
-  // "[X] 타입 : 내용" — 일반형. 콜론이 아예 없는 오탈자 행은 전체를 content로.
+  // "[X] 타입 : 내용" (대괄호 없으면 "타입 : 내용") — 일반형. 콜론이 아예 없는 오탈자 행은 전체를 content로.
   const typeContentMatch = rest.match(TYPE_CONTENT_RE);
   if (!rest.includes(":") || !typeContentMatch) {
     return {
