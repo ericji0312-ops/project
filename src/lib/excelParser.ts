@@ -26,7 +26,8 @@ const TYPE_RULES: { pattern: RegExp; type: string }[] = [
   { pattern: /RX/i, type: "RX" },
   { pattern: /(오답|틀린\s*문제)/, type: "오답노트" },
   { pattern: /개념/, type: "개념" },
-  { pattern: /(쎈|라이트쎈)/, type: "라이트쎈" },
+  { pattern: /라이트쎈/, type: "라이트쎈" },
+  { pattern: /쎈/, type: "쎈" },
   { pattern: /연산/, type: "연산" },
   { pattern: /RPM/i, type: "RPM" },
 ];

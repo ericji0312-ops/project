@@ -7,7 +7,7 @@ import { generateCopyText, type AssignedLine } from "@/lib/textGenerator";
 import type { ScheduleComponent } from "@/types/schedule";
 import { listTeachersBasic, type TeacherBasic } from "@/app/actions/teachers";
 
-const TYPE_COLUMN_PRIORITY = ["개념", "연산", "RX", "라이트쎈", "오답노트"];
+const TYPE_COLUMN_PRIORITY = ["개념", "연산", "RX", "쎈", "라이트쎈", "오답노트"];
 
 function toISODateLocal(date: Date): string {
   const y = date.getFullYear();
