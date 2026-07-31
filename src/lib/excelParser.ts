@@ -28,6 +28,7 @@ const TYPE_RULES: { pattern: RegExp; type: string }[] = [
   { pattern: /개념/, type: "개념" },
   { pattern: /(쎈|라이트쎈)/, type: "라이트쎈" },
   { pattern: /연산/, type: "연산" },
+  { pattern: /RPM/i, type: "RPM" },
 ];
 
 function detectType(text: string): string {
