@@ -49,6 +49,8 @@ export default function ScheduleAssignment() {
   const [teachers, setTeachers] = useState<TeacherBasic[]>([]);
   // "all" | "unassigned" | teacherId — 학생 목록을 담당 선생님으로 좁힐 때 사용.
   const [teacherFilter, setTeacherFilter] = useState<string>("all");
+  // "all" | subjectId — 학생 목록을 수강 과목으로 좁힐 때 사용.
+  const [studentSubjectFilter, setStudentSubjectFilter] = useState<string>("all");
 
   useEffect(() => {
     listTeachersBasic()
@@ -56,11 +58,22 @@ export default function ScheduleAssignment() {
       .catch(() => setTeachers([]));
   }, []);
 
-  const studentsForTeacherFilter = useMemo(() => {
-    if (teacherFilter === "all") return students;
-    if (teacherFilter === "unassigned") return students.filter((s) => !s.teacherId);
-    return students.filter((s) => s.teacherId === teacherFilter);
-  }, [students, teacherFilter]);
+  const studentsForFilters = useMemo(() => {
+    let list = students;
+    if (teacherFilter === "unassigned") list = list.filter((s) => !s.teacherId);
+    else if (teacherFilter !== "all") list = list.filter((s) => s.teacherId === teacherFilter);
+
+    if (studentSubjectFilter !== "all") {
+      const enrolledIds = new Set(
+        studentSubjects
+          .filter((ss) => ss.subjectId === studentSubjectFilter)
+          .map((ss) => ss.studentId)
+      );
+      list = list.filter((s) => enrolledIds.has(s.id));
+    }
+
+    return list;
+  }, [students, teacherFilter, studentSubjectFilter, studentSubjects]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deadlineMode, setDeadlineMode] = useState<"auto" | "manual">("auto");
@@ -97,15 +110,15 @@ export default function ScheduleAssignment() {
   );
 
   useEffect(() => {
-    if (studentsForTeacherFilter.length === 0) {
+    if (studentsForFilters.length === 0) {
       if (studentId) setStudentId("");
       return;
     }
-    if (!studentsForTeacherFilter.some((s) => s.id === studentId)) {
-      handleStudentChange(studentsForTeacherFilter[0].id);
+    if (!studentsForFilters.some((s) => s.id === studentId)) {
+      handleStudentChange(studentsForFilters[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studentsForTeacherFilter, studentId]);
+  }, [studentsForFilters, studentId]);
 
   useEffect(() => {
     if (!subjectId && subjectsForStudent.length > 0) setSubjectId(subjectsForStudent[0].id);
@@ -343,14 +356,30 @@ export default function ScheduleAssignment() {
         </label>
 
         <label className="flex flex-col gap-1">
+          <span className="font-medium">수강 과목</span>
+          <select
+            className="border rounded px-2 py-1"
+            value={studentSubjectFilter}
+            onChange={(e) => setStudentSubjectFilter(e.target.value)}
+          >
+            <option value="all">전체</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
           <span className="font-medium">학생</span>
           <select
             className="border rounded px-2 py-1"
             value={studentId}
             onChange={(e) => handleStudentChange(e.target.value)}
           >
-            {studentsForTeacherFilter.length === 0 && <option value="">학생 없음</option>}
-            {studentsForTeacherFilter.map((s) => (
+            {studentsForFilters.length === 0 && <option value="">학생 없음</option>}
+            {studentsForFilters.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
