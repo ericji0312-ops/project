@@ -32,9 +32,25 @@ const TYPE_RULES: { pattern: RegExp; type: string }[] = [
   { pattern: /RPM/i, type: "RPM" },
 ];
 
-function detectType(text: string): string {
+// "기출의 로직" 계열은 커리큘럼마다 번호가 달라도(기로4-, 기로5...) 몇 스텝인지가
+// 핵심 구분값이라, 스텝 번호를 그대로 타입에 반영한다. 예: "기출의 로직(1스텝)".
+// 스텝 표기가 "1스텝"(한글), "step1"(영문), "[Step1]"(대괄호, content 쪽에 붙는 경우) 등
+// 파일마다 제각각이라 한 정규식으로 함께 잡는다.
+const GIRO_STEP_RE = /기출.*?(?:(\d)\s*스텝|step\s*(\d))/i;
+// typeLabel에 스텝 번호가 없고(예: "기출의 로직4+") content 쪽에 "틀린문제 다시 풀기"류
+// 오답 복습 행만 있는 경우 — 별도 스텝 매칭이 불가능하므로 오답노트로 분류한다.
+const REVIEW_RE = /(오답|틀린\s*문제)/;
+
+function detectType(typeLabel: string, content: string = ""): string {
+  if (/기출/.test(typeLabel) || /기출/.test(content)) {
+    const combined = `${typeLabel} ${content}`;
+    const stepMatch = combined.match(GIRO_STEP_RE);
+    if (stepMatch) return `기출의 로직(${stepMatch[1] ?? stepMatch[2]}스텝)`;
+    if (REVIEW_RE.test(combined)) return "오답노트";
+  }
+
   for (const rule of TYPE_RULES) {
-    if (rule.pattern.test(text)) return rule.type;
+    if (rule.pattern.test(typeLabel)) return rule.type;
   }
   return "기타";
 }
@@ -96,7 +112,7 @@ export function parseRow(order: number, rawCellText: string): ParsedScheduleRow 
     rawText: text,
     curriculumNameInFile,
     typeLabel,
-    type: detectType(typeLabel),
+    type: detectType(typeLabel, content),
     content,
   };
 }
