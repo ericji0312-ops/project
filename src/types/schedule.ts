@@ -56,6 +56,9 @@ export interface Student {
   name: string;
   /** 담당 선생님 id. 아직 배정되지 않았으면 null. */
   teacherId: string | null;
+  /** 복사용 텍스트를 마지막으로 지운 시각. 이 시각 이전에 배정된 항목은 복사용
+   * 텍스트에서만 제외되고, 배정 기록 자체는 그대로 남는다. 지운 적 없으면 null. */
+  copyClearedAt: string | null;
 }
 
 /** 학생이 실제로 듣는 과목 — 배정 기록과 별개로 명시적으로 등록/해제한다. */

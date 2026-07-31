@@ -108,3 +108,13 @@ alter table students
   add column if not exists teacher_id uuid references teachers(id) on delete set null;
 
 create index if not exists students_teacher_id_idx on students (teacher_id);
+
+-- ============================================================
+-- 마이그레이션 (2026-07-31): 복사용 텍스트 지우기
+-- 배정 기록(schedule 배정 자체)은 그대로 두고, 배정 화면의 "복사용 텍스트" 박스에서만
+-- 이 시각 이전 항목을 숨기기 위한 시각 기록. 표의 "배정됨" 체크/취소 기능에는 영향 없음.
+-- Supabase 대시보드 > SQL Editor 에서 아래 블록만 실행하면 됨.
+-- ============================================================
+
+alter table students
+  add column if not exists copy_cleared_at timestamptz;

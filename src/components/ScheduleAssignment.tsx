@@ -37,6 +37,7 @@ export default function ScheduleAssignment() {
   const createAssignments = useScheduleStore((s) => s.createAssignments);
   const resetAssignmentsForStudent = useScheduleStore((s) => s.resetAssignmentsForStudent);
   const deleteAssignment = useScheduleStore((s) => s.deleteAssignment);
+  const clearCopyText = useScheduleStore((s) => s.clearCopyText);
 
   useEffect(() => {
     if (!initialized) fetchAll();
@@ -195,6 +196,25 @@ export default function ScheduleAssignment() {
       .filter((x): x is AssignedLine => x !== null);
   }, [assignments, studentId, componentById, itemById, curriculumById]);
 
+  const currentStudent = students.find((s) => s.id === studentId) ?? null;
+
+  // 복사용 텍스트에만 쓰는 목록 — "지우기"로 숨긴 시각 이전 항목은 제외한다.
+  // 배정 기록 자체(위 currentAssignmentLines, 표의 배정됨 체크)에는 영향을 주지 않는다.
+  const copyableAssignmentLines: AssignedLine[] = useMemo(() => {
+    const clearedAt = currentStudent?.copyClearedAt;
+    return assignments
+      .filter((a) => a.studentId === studentId)
+      .filter((a) => !clearedAt || a.assignedAt > clearedAt)
+      .map((a) => {
+        const component = componentById.get(a.scheduleComponentId);
+        const item = component ? itemById.get(component.scheduleItemId) : undefined;
+        const curriculum = item ? curriculumById.get(item.curriculumId) : undefined;
+        if (!component || !curriculum) return null;
+        return { deadlineDate: a.deadlineDate, curriculum, component };
+      })
+      .filter((x): x is AssignedLine => x !== null);
+  }, [assignments, studentId, componentById, itemById, curriculumById, currentStudent]);
+
   const assignedComponentIds = useMemo(
     () => new Set(currentAssignmentLines.map((l) => l.component.id)),
     [currentAssignmentLines]
@@ -317,7 +337,19 @@ export default function ScheduleAssignment() {
     }
   }
 
-  const copyText = generateCopyText(currentAssignmentLines);
+  async function handleClearCopyText() {
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      await clearCopyText(studentId);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const copyText = generateCopyText(copyableAssignmentLines);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(copyText);
@@ -617,8 +649,17 @@ export default function ScheduleAssignment() {
               className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:shadow-none"
               onClick={handleResetAssignments}
               disabled={currentAssignmentLines.length === 0 || submitting}
+              title="실제 배정 기록을 삭제합니다 (표의 배정됨 체크도 함께 취소됨)"
             >
               배정 초기화
+            </button>
+            <button
+              className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:shadow-none"
+              onClick={handleClearCopyText}
+              disabled={copyableAssignmentLines.length === 0 || submitting}
+              title="배정 기록은 그대로 두고 복사용 텍스트만 비웁니다"
+            >
+              텍스트 지우기
             </button>
             <button
               className="text-xs bg-gray-800 text-white rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-900 hover:shadow-md disabled:opacity-40 disabled:hover:bg-gray-800 disabled:hover:shadow-none"

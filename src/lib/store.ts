@@ -51,8 +51,18 @@ function mapScheduleComponent(row: {
   };
 }
 
-function mapStudent(row: { id: string; name: string; teacher_id: string | null }): Student {
-  return { id: row.id, name: row.name, teacherId: row.teacher_id };
+function mapStudent(row: {
+  id: string;
+  name: string;
+  teacher_id: string | null;
+  copy_cleared_at: string | null;
+}): Student {
+  return {
+    id: row.id,
+    name: row.name,
+    teacherId: row.teacher_id,
+    copyClearedAt: row.copy_cleared_at,
+  };
 }
 
 function mapStudentSubject(row: {
@@ -97,6 +107,8 @@ interface ScheduleStore {
   addStudent: (name: string) => Promise<Student>;
   deleteStudent: (studentId: string) => Promise<void>;
   setStudentTeacher: (studentId: string, teacherId: string | null) => Promise<void>;
+  /** 배정 기록은 그대로 두고, 복사용 텍스트 화면에서만 지금까지의 항목을 숨긴다. */
+  clearCopyText: (studentId: string) => Promise<void>;
   addStudentSubject: (studentId: string, subjectId: string) => Promise<void>;
   removeStudentSubject: (studentSubjectId: string) => Promise<void>;
   addCurriculum: (
@@ -238,6 +250,19 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
 
     set((state) => ({
       students: state.students.map((s) => (s.id === studentId ? { ...s, teacherId } : s)),
+    }));
+  },
+
+  clearCopyText: async (studentId) => {
+    const copyClearedAt = new Date().toISOString();
+    const { error } = await supabase
+      .from("students")
+      .update({ copy_cleared_at: copyClearedAt })
+      .eq("id", studentId);
+    if (error) throw new Error(error.message);
+
+    set((state) => ({
+      students: state.students.map((s) => (s.id === studentId ? { ...s, copyClearedAt } : s)),
     }));
   },
 
