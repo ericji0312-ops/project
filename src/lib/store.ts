@@ -118,6 +118,22 @@ interface ScheduleStore {
   deleteAssignment: (assignmentId: string) => Promise<void>;
 }
 
+// Supabase/PostgREST는 select("*")에 기본 최대 행 수 제한(보통 1000)이 있어
+// 테이블이 그보다 커지면 나머지 행이 조용히 잘린다. range()로 끝까지 이어서 가져온다.
+async function fetchAllRows<T>(table: string): Promise<{ data: T[]; error: { message: string } | null }> {
+  const pageSize = 1000;
+  const allRows: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase.from(table).select("*").range(from, from + pageSize - 1);
+    if (error) return { data: allRows, error };
+    allRows.push(...((data ?? []) as T[]));
+    if (!data || data.length < pageSize) break;
+    from += pageSize;
+  }
+  return { data: allRows, error: null };
+}
+
 export const useScheduleStore = create<ScheduleStore>((set, get) => ({
   initialized: false,
   loading: false,
@@ -144,13 +160,13 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
       studentSubjectsRes,
       assignmentsRes,
     ] = await Promise.all([
-      supabase.from("subjects").select("*"),
-      supabase.from("curricula").select("*"),
-      supabase.from("schedule_items").select("*"),
-      supabase.from("schedule_components").select("*"),
-      supabase.from("students").select("*"),
-      supabase.from("student_subjects").select("*"),
-      supabase.from("assignments").select("*"),
+      fetchAllRows<Subject>("subjects"),
+      fetchAllRows<Parameters<typeof mapCurriculum>[0]>("curricula"),
+      fetchAllRows<Parameters<typeof mapScheduleItem>[0]>("schedule_items"),
+      fetchAllRows<Parameters<typeof mapScheduleComponent>[0]>("schedule_components"),
+      fetchAllRows<Parameters<typeof mapStudent>[0]>("students"),
+      fetchAllRows<Parameters<typeof mapStudentSubject>[0]>("student_subjects"),
+      fetchAllRows<Parameters<typeof mapAssignment>[0]>("assignments"),
     ]);
 
     const firstError =
