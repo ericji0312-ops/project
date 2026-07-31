@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useScheduleStore } from "@/lib/store";
 import { generateCopyText, type AssignedLine } from "@/lib/textGenerator";
 import type { ScheduleComponent } from "@/types/schedule";
+import { listTeachersBasic, type TeacherBasic } from "@/app/actions/teachers";
 
 const TYPE_COLUMN_PRIORITY = ["개념", "연산", "RX", "라이트쎈", "오답노트"];
 
@@ -45,6 +46,22 @@ export default function ScheduleAssignment() {
   const [subjectId, setSubjectId] = useState("");
   const [curriculumId, setCurriculumId] = useState("");
 
+  const [teachers, setTeachers] = useState<TeacherBasic[]>([]);
+  // "all" | "unassigned" | teacherId — 학생 목록을 담당 선생님으로 좁힐 때 사용.
+  const [teacherFilter, setTeacherFilter] = useState<string>("all");
+
+  useEffect(() => {
+    listTeachersBasic()
+      .then(setTeachers)
+      .catch(() => setTeachers([]));
+  }, []);
+
+  const studentsForTeacherFilter = useMemo(() => {
+    if (teacherFilter === "all") return students;
+    if (teacherFilter === "unassigned") return students.filter((s) => !s.teacherId);
+    return students.filter((s) => s.teacherId === teacherFilter);
+  }, [students, teacherFilter]);
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deadlineMode, setDeadlineMode] = useState<"auto" | "manual">("auto");
   const [autoStartDate, setAutoStartDate] = useState(toISODateLocal(new Date()));
@@ -80,8 +97,15 @@ export default function ScheduleAssignment() {
   );
 
   useEffect(() => {
-    if (!studentId && students.length > 0) setStudentId(students[0].id);
-  }, [students, studentId]);
+    if (studentsForTeacherFilter.length === 0) {
+      if (studentId) setStudentId("");
+      return;
+    }
+    if (!studentsForTeacherFilter.some((s) => s.id === studentId)) {
+      handleStudentChange(studentsForTeacherFilter[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentsForTeacherFilter, studentId]);
 
   useEffect(() => {
     if (!subjectId && subjectsForStudent.length > 0) setSubjectId(subjectsForStudent[0].id);
@@ -302,14 +326,31 @@ export default function ScheduleAssignment() {
 
       <section className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1">
+          <span className="font-medium">선생님</span>
+          <select
+            className="border rounded px-2 py-1"
+            value={teacherFilter}
+            onChange={(e) => setTeacherFilter(e.target.value)}
+          >
+            <option value="all">전체</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+            <option value="unassigned">미배정</option>
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
           <span className="font-medium">학생</span>
           <select
             className="border rounded px-2 py-1"
             value={studentId}
             onChange={(e) => handleStudentChange(e.target.value)}
           >
-            {students.length === 0 && <option value="">학생 없음</option>}
-            {students.map((s) => (
+            {studentsForTeacherFilter.length === 0 && <option value="">학생 없음</option>}
+            {studentsForTeacherFilter.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
