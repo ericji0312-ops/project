@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { supabase } from "@/lib/supabaseClient";
+import { parseRow } from "@/lib/excelParser";
 import type {
   Subject,
   Curriculum,
@@ -9,6 +10,14 @@ import type {
   StudentSubject,
   Assignment,
 } from "@/types/schedule";
+
+// 커리큘럼 인앱 편집기에서 "타입 : 내용" 한 줄만 입력받아도 업로드 때와 동일한
+// parseRow() 규칙을 재사용할 수 있도록, 원본 엑셀 셀 형식([커리큘럼명] ...)을 복원한다.
+export function prefixedLine(curriculum: Curriculum, rawLine: string): string {
+  return curriculum.hasTypedComponents
+    ? `[${curriculum.name}] ${rawLine}`
+    : `[${curriculum.name}]: ${rawLine}`;
+}
 
 // DB(snake_case) <-> 앱 타입(camelCase) 매핑
 function mapCurriculum(row: {
@@ -123,6 +132,21 @@ interface ScheduleStore {
     items: ScheduleItem[],
     components: ScheduleComponent[]
   ) => Promise<number>;
+  /** 인앱 편집기용: 회차 하나에 "타입 : 내용" 줄들을 추가한다. 해당 회차가 없으면 새로 만든다. */
+  addComponentsToOrder: (
+    curriculumId: string,
+    order: number,
+    rawLines: string[]
+  ) => Promise<{ warnings: string[] }>;
+  /** 인앱 편집기용: 구성요소 한 줄을 새 텍스트로 재파싱해 덮어쓴다. */
+  updateScheduleComponent: (
+    componentId: string,
+    curriculumId: string,
+    order: number,
+    rawLine: string
+  ) => Promise<{ warning?: string }>;
+  deleteScheduleComponent: (componentId: string) => Promise<void>;
+  deleteScheduleItem: (itemId: string) => Promise<void>;
   createAssignments: (
     lines: { studentId: string; scheduleComponentId: string; deadlineDate: string }[]
   ) => Promise<void>;
@@ -405,6 +429,128 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
         scheduleComponents: state.scheduleComponents.filter(
           (c) => !deletedItemIds.has(c.scheduleItemId)
         ),
+        assignments: state.assignments.filter(
+          (a) => !deletedComponentIds.has(a.scheduleComponentId)
+        ),
+      };
+    });
+  },
+
+  addComponentsToOrder: async (curriculumId, order, rawLines) => {
+    const curriculum = get().curricula.find((c) => c.id === curriculumId);
+    if (!curriculum) throw new Error("커리큘럼을 찾을 수 없습니다.");
+
+    let item = get().scheduleItems.find(
+      (i) => i.curriculumId === curriculumId && i.order === order
+    );
+
+    if (!item) {
+      const { data, error } = await supabase
+        .from("schedule_items")
+        .insert({ curriculum_id: curriculumId, order_no: order })
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      item = mapScheduleItem(data);
+      const newItem = item;
+      set((state) => ({ scheduleItems: [...state.scheduleItems, newItem] }));
+    }
+
+    const parsedRows = rawLines
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => parseRow(order, prefixedLine(curriculum, line)))
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+
+    const warnings = parsedRows
+      .filter((r) => curriculum.hasTypedComponents && r.typeLabel === null)
+      .map((r) => `콜론(:) 구분자를 찾지 못해 type을 키워드로 추정했습니다 — "${r.content}"`);
+
+    if (parsedRows.length === 0) return { warnings };
+
+    const { data: componentRows, error: componentsError } = await supabase
+      .from("schedule_components")
+      .insert(
+        parsedRows.map((r) => ({
+          schedule_item_id: item!.id,
+          type: r.type,
+          type_label: r.typeLabel,
+          content: r.content,
+          raw_text: r.rawText,
+        }))
+      )
+      .select();
+    if (componentsError) throw new Error(componentsError.message);
+
+    const realComponents = componentRows.map(mapScheduleComponent);
+    set((state) => ({
+      scheduleComponents: [...state.scheduleComponents, ...realComponents],
+    }));
+
+    return { warnings };
+  },
+
+  updateScheduleComponent: async (componentId, curriculumId, order, rawLine) => {
+    const curriculum = get().curricula.find((c) => c.id === curriculumId);
+    if (!curriculum) throw new Error("커리큘럼을 찾을 수 없습니다.");
+
+    const parsed = parseRow(order, prefixedLine(curriculum, rawLine.trim()));
+    if (!parsed) throw new Error("내용을 입력해주세요.");
+
+    const { error } = await supabase
+      .from("schedule_components")
+      .update({
+        type: parsed.type,
+        type_label: parsed.typeLabel,
+        content: parsed.content,
+        raw_text: parsed.rawText,
+      })
+      .eq("id", componentId);
+    if (error) throw new Error(error.message);
+
+    set((state) => ({
+      scheduleComponents: state.scheduleComponents.map((c) =>
+        c.id === componentId
+          ? {
+              ...c,
+              type: parsed.type,
+              typeLabel: parsed.typeLabel,
+              content: parsed.content,
+              rawText: parsed.rawText,
+            }
+          : c
+      ),
+    }));
+
+    const warning =
+      curriculum.hasTypedComponents && parsed.typeLabel === null
+        ? `콜론(:) 구분자를 찾지 못해 type을 키워드로 추정했습니다 — "${parsed.content}"`
+        : undefined;
+
+    return { warning };
+  },
+
+  deleteScheduleComponent: async (componentId) => {
+    const { error } = await supabase.from("schedule_components").delete().eq("id", componentId);
+    if (error) throw new Error(error.message);
+
+    set((state) => ({
+      scheduleComponents: state.scheduleComponents.filter((c) => c.id !== componentId),
+      assignments: state.assignments.filter((a) => a.scheduleComponentId !== componentId),
+    }));
+  },
+
+  deleteScheduleItem: async (itemId) => {
+    const { error } = await supabase.from("schedule_items").delete().eq("id", itemId);
+    if (error) throw new Error(error.message);
+
+    set((state) => {
+      const deletedComponentIds = new Set(
+        state.scheduleComponents.filter((c) => c.scheduleItemId === itemId).map((c) => c.id)
+      );
+      return {
+        scheduleItems: state.scheduleItems.filter((i) => i.id !== itemId),
+        scheduleComponents: state.scheduleComponents.filter((c) => c.scheduleItemId !== itemId),
         assignments: state.assignments.filter(
           (a) => !deletedComponentIds.has(a.scheduleComponentId)
         ),

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useScheduleStore } from "@/lib/store";
 import { parseExcelWorkbook, type ParsedCurriculumData } from "@/lib/excelParser";
+import CurriculumItemEditor from "@/components/CurriculumItemEditor";
 
 interface SheetConfig {
   curriculumName: string;
@@ -47,6 +48,7 @@ export default function UploadCurriculum() {
   const [loadingSheet, setLoadingSheet] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [expandedCurriculumId, setExpandedCurriculumId] = useState<string | null>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -359,44 +361,52 @@ export default function UploadCurriculum() {
               scheduleItems.some((i) => i.id === comp.scheduleItemId && i.curriculumId === c.id)
             ).length;
             const isPending = pendingDeleteId === c.id;
+            const isExpanded = expandedCurriculumId === c.id;
 
             return (
-              <div key={c.id} className="flex items-center justify-between p-3">
-                <div>
-                  <span className="font-medium">{c.name}</span>
-                  <span className="ml-2 text-xs text-gray-500">
-                    {subjectName} · 회차 {itemCount}개 · 구성요소 {componentCount}개
-                  </span>
+              <div key={c.id}>
+                <div className="flex items-center justify-between p-3">
+                  <button
+                    className="text-left transition-colors hover:text-blue-600"
+                    onClick={() => setExpandedCurriculumId(isExpanded ? null : c.id)}
+                  >
+                    <span className="font-medium">{c.name}</span>
+                    <span className="ml-2 text-xs text-gray-500">
+                      {subjectName} · 회차 {itemCount}개 · 구성요소 {componentCount}개
+                    </span>
+                  </button>
+
+                  {isPending ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-red-600">
+                        정말 삭제할까요? (회차/구성요소/관련 배정 기록 모두 삭제됨)
+                      </span>
+                      <button
+                        className="text-xs bg-red-600 text-white rounded px-2 py-1 transition-colors duration-150 hover:bg-red-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-red-600 disabled:hover:shadow-none"
+                        disabled={deleting}
+                        onClick={() => handleDeleteCurriculum(c.id)}
+                      >
+                        확인
+                      </button>
+                      <button
+                        className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800"
+                        disabled={deleting}
+                        onClick={() => setPendingDeleteId(null)}
+                      >
+                        취소
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="text-xs text-gray-500 transition-colors hover:text-red-600"
+                      onClick={() => setPendingDeleteId(c.id)}
+                    >
+                      삭제
+                    </button>
+                  )}
                 </div>
 
-                {isPending ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-red-600">
-                      정말 삭제할까요? (회차/구성요소/관련 배정 기록 모두 삭제됨)
-                    </span>
-                    <button
-                      className="text-xs bg-red-600 text-white rounded px-2 py-1 transition-colors duration-150 hover:bg-red-700 hover:shadow-md disabled:opacity-40 disabled:hover:bg-red-600 disabled:hover:shadow-none"
-                      disabled={deleting}
-                      onClick={() => handleDeleteCurriculum(c.id)}
-                    >
-                      확인
-                    </button>
-                    <button
-                      className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800"
-                      disabled={deleting}
-                      onClick={() => setPendingDeleteId(null)}
-                    >
-                      취소
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="text-xs text-gray-500 transition-colors hover:text-red-600"
-                    onClick={() => setPendingDeleteId(c.id)}
-                  >
-                    삭제
-                  </button>
-                )}
+                {isExpanded && <CurriculumItemEditor curriculumId={c.id} />}
               </div>
             );
           })}
