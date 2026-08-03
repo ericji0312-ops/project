@@ -792,7 +792,7 @@ export default function ScheduleAssignment({ session }: { session: CurrentSessio
           <h2 className="font-semibold">복사용 텍스트</h2>
           <div className="flex gap-2">
             <button
-              className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:shadow-none"
+              className="text-xs border rounded px-2 py-1 text-gray-700 dark:text-gray-300 cursor-pointer transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800 disabled:cursor-not-allowed disabled:pointer-events-none disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400 dark:disabled:border-neutral-800 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-600"
               onClick={handleResetAssignments}
               disabled={currentAssignmentLines.length === 0 || submitting}
               title="실제 배정 기록을 삭제합니다 (표의 배정됨 체크도 함께 취소됨)"
@@ -800,7 +800,7 @@ export default function ScheduleAssignment({ session }: { session: CurrentSessio
               배정 초기화
             </button>
             <button
-              className="text-xs border rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:shadow-none"
+              className="text-xs border rounded px-2 py-1 text-gray-700 dark:text-gray-300 cursor-pointer transition-colors duration-150 hover:bg-gray-50 hover:shadow-sm dark:hover:bg-neutral-800 disabled:cursor-not-allowed disabled:pointer-events-none disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400 dark:disabled:border-neutral-800 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-600"
               onClick={handleClearCopyText}
               disabled={copyableAssignmentLines.length === 0 || submitting}
               title="배정 기록은 그대로 두고 복사용 텍스트만 비웁니다"
@@ -808,7 +808,7 @@ export default function ScheduleAssignment({ session }: { session: CurrentSessio
               텍스트 지우기
             </button>
             <button
-              className="text-xs bg-gray-800 text-white rounded px-2 py-1 transition-colors duration-150 hover:bg-gray-900 hover:shadow-md disabled:opacity-40 disabled:hover:bg-gray-800 disabled:hover:shadow-none"
+              className="text-xs rounded px-2 py-1 bg-gray-800 text-white cursor-pointer transition-colors duration-150 hover:bg-gray-900 hover:shadow-md disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none disabled:bg-gray-100 disabled:text-gray-400 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-600"
               onClick={handleCopy}
               disabled={!copyText}
             >
