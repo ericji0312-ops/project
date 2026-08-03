@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useScheduleStore } from "@/lib/store";
-import { generateCopyText, type AssignedLine } from "@/lib/textGenerator";
+import { generateCopyText, formatComponentLine, formatDateHeader, type AssignedLine } from "@/lib/textGenerator";
 import type { ScheduleComponent } from "@/types/schedule";
+
+const RECENT_DAYS = 7;
 import { listTeachersBasic, type TeacherBasic } from "@/app/actions/teachers";
 
 const TYPE_COLUMN_PRIORITY = [
@@ -224,6 +226,32 @@ export default function ScheduleAssignment() {
       })
       .filter((x): x is AssignedLine => x !== null);
   }, [assignments, studentId, componentById, itemById, curriculumById, currentStudent]);
+
+  // 학생별 "최근 N일 배정내역" — 복사용 텍스트를 지워도(copyClearedAt) 영향받지 않고,
+  // 배정된 시각(assignedAt) 기준으로 최근 항목을 그대로 보여준다.
+  const recentAssignmentsByDate = useMemo(() => {
+    const cutoff = Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000;
+    const lines = assignments
+      .filter((a) => a.studentId === studentId && new Date(a.assignedAt).getTime() >= cutoff)
+      .map((a) => {
+        const component = componentById.get(a.scheduleComponentId);
+        const item = component ? itemById.get(component.scheduleItemId) : undefined;
+        const curriculum = item ? curriculumById.get(item.curriculumId) : undefined;
+        if (!component || !curriculum) return null;
+        return { assignedAt: a.assignedAt, deadlineDate: a.deadlineDate, curriculum, component };
+      })
+      .filter((x): x is AssignedLine & { assignedAt: string } => x !== null)
+      .sort((a, b) => b.assignedAt.localeCompare(a.assignedAt));
+
+    const byDate = new Map<string, typeof lines>();
+    for (const line of lines) {
+      const dateKey = toISODateLocal(new Date(line.assignedAt));
+      const list = byDate.get(dateKey) ?? [];
+      list.push(line);
+      byDate.set(dateKey, list);
+    }
+    return [...byDate.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [assignments, studentId, componentById, itemById, curriculumById]);
 
   const assignedComponentIds = useMemo(
     () => new Set(currentAssignmentLines.map((l) => l.component.id)),
@@ -473,6 +501,33 @@ export default function ScheduleAssignment() {
           </select>
         </label>
       </section>
+
+      {currentStudent && (
+        <section className="space-y-2 border rounded p-4">
+          <h2 className="font-semibold">최근 {RECENT_DAYS}일 배정내역 — {currentStudent.name}</h2>
+          {recentAssignmentsByDate.length === 0 ? (
+            <p className="text-xs text-gray-500">최근 {RECENT_DAYS}일간 배정된 항목이 없습니다.</p>
+          ) : (
+            <div className="space-y-2 max-h-40 overflow-auto">
+              {recentAssignmentsByDate.map(([dateKey, lines]) => (
+                <div key={dateKey}>
+                  <div className="text-xs font-medium text-gray-500">
+                    {formatDateHeader(dateKey)} 배정
+                  </div>
+                  <ul className="text-xs space-y-0.5 pl-2">
+                    {lines.map((l) => (
+                      <li key={l.component.id}>
+                        - {formatComponentLine(l.curriculum, l.component)}
+                        <span className="text-gray-400"> (마감 {formatDateHeader(l.deadlineDate)})</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {curriculum && (
         <section className="overflow-auto border rounded max-h-[42vh]">
