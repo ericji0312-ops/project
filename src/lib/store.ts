@@ -113,7 +113,7 @@ interface ScheduleStore {
 
   fetchAll: () => Promise<void>;
   addSubject: (name: string) => Promise<Subject>;
-  addStudent: (name: string) => Promise<Student>;
+  addStudent: (name: string, teacherId?: string | null) => Promise<Student>;
   deleteStudent: (studentId: string) => Promise<void>;
   setStudentTeacher: (studentId: string, teacherId: string | null) => Promise<void>;
   /** 배정 기록은 그대로 두고, 복사용 텍스트 화면에서만 지금까지의 항목을 숨긴다. */
@@ -244,8 +244,12 @@ export const useScheduleStore = create<ScheduleStore>((set, get) => ({
     return subject;
   },
 
-  addStudent: async (name) => {
-    const { data, error } = await supabase.from("students").insert({ name }).select().single();
+  addStudent: async (name, teacherId) => {
+    const { data, error } = await supabase
+      .from("students")
+      .insert({ name, teacher_id: teacherId ?? null })
+      .select()
+      .single();
     if (error) throw new Error(error.message);
 
     const student = mapStudent(data);

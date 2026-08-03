@@ -1,5 +1,7 @@
 import StudentManagement from "@/components/StudentManagement";
+import { getSession } from "@/lib/session";
 
-export default function StudentsPage() {
-  return <StudentManagement />;
+export default async function StudentsPage() {
+  const session = await getSession();
+  return <StudentManagement session={session} />;
 }

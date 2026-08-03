@@ -3,8 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useScheduleStore } from "@/lib/store";
 import { listTeachersBasic, type TeacherBasic } from "@/app/actions/teachers";
+import type { CurrentSession } from "@/lib/session";
 
-export default function StudentManagement() {
+export default function StudentManagement({ session }: { session: CurrentSession | null }) {
+  const isTeacher = session?.role === "teacher";
+  const ownTeacherId = session?.teacherId;
+
   const initialized = useScheduleStore((s) => s.initialized);
   const loading = useScheduleStore((s) => s.loading);
   const storeError = useScheduleStore((s) => s.error);
@@ -39,7 +43,10 @@ export default function StudentManagement() {
   const [teacherBusyByStudent, setTeacherBusyByStudent] = useState<Record<string, boolean>>({});
 
   // "전체" | "unassigned" | teacherId
-  const [teacherFilter, setTeacherFilter] = useState<string>("all");
+  // 선생님 계정은 실수로 다른 선생님 학생을 잘못 배정하는 일을 막기 위해 항상 본인 학생으로 고정한다.
+  const [teacherFilter, setTeacherFilter] = useState<string>(
+    isTeacher && ownTeacherId ? ownTeacherId : "all"
+  );
   const [countSort, setCountSort] = useState<"asc" | "desc" | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -91,7 +98,7 @@ export default function StudentManagement() {
     setActionError(null);
     setBusy(true);
     try {
-      await addStudent(name);
+      await addStudent(name, isTeacher ? ownTeacherId : undefined);
       setNewName("");
     } catch (e) {
       setActionError(e instanceof Error ? e.message : String(e));
@@ -191,39 +198,67 @@ export default function StudentManagement() {
       <section className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap gap-1.5">
-            <button
-              className={`rounded-full px-3 py-1 text-xs transition-colors duration-150 ${
-                teacherFilter === "all"
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "border text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-neutral-800"
-              }`}
-              onClick={() => setTeacherFilter("all")}
-            >
-              전체
-            </button>
-            {teachers.map((t) => (
-              <button
-                key={t.id}
-                className={`rounded-full px-3 py-1 text-xs transition-colors duration-150 ${
-                  teacherFilter === t.id
-                    ? "bg-blue-600 text-white hover:bg-blue-700"
-                    : "border text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-neutral-800"
-                }`}
-                onClick={() => setTeacherFilter(t.id)}
-              >
-                {t.name}
-              </button>
-            ))}
-            <button
-              className={`rounded-full px-3 py-1 text-xs transition-colors duration-150 ${
-                teacherFilter === "unassigned"
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "border text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-neutral-800"
-              }`}
-              onClick={() => setTeacherFilter("unassigned")}
-            >
-              미배정
-            </button>
+            {isTeacher ? (
+              <>
+                <button
+                  className={`rounded-full px-3 py-1 text-xs transition-colors duration-150 ${
+                    teacherFilter === ownTeacherId
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "border text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-neutral-800"
+                  }`}
+                  onClick={() => setTeacherFilter(ownTeacherId ?? "all")}
+                >
+                  내 학생
+                </button>
+                <button
+                  className={`rounded-full px-3 py-1 text-xs transition-colors duration-150 ${
+                    teacherFilter === "unassigned"
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "border text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-neutral-800"
+                  }`}
+                  onClick={() => setTeacherFilter("unassigned")}
+                  title="아직 담당 선생님이 지정되지 않은 학생 — 여기서 찾아 담당 선생님 칸에서 나를 지정할 수 있습니다"
+                >
+                  미배정
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className={`rounded-full px-3 py-1 text-xs transition-colors duration-150 ${
+                    teacherFilter === "all"
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "border text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-neutral-800"
+                  }`}
+                  onClick={() => setTeacherFilter("all")}
+                >
+                  전체
+                </button>
+                {teachers.map((t) => (
+                  <button
+                    key={t.id}
+                    className={`rounded-full px-3 py-1 text-xs transition-colors duration-150 ${
+                      teacherFilter === t.id
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "border text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-neutral-800"
+                    }`}
+                    onClick={() => setTeacherFilter(t.id)}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+                <button
+                  className={`rounded-full px-3 py-1 text-xs transition-colors duration-150 ${
+                    teacherFilter === "unassigned"
+                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                      : "border text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-neutral-800"
+                  }`}
+                  onClick={() => setTeacherFilter("unassigned")}
+                >
+                  미배정
+                </button>
+              </>
+            )}
           </div>
 
           <input

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useScheduleStore } from "@/lib/store";
 import { generateCopyText, formatComponentLine, formatDateHeader, type AssignedLine } from "@/lib/textGenerator";
 import type { ScheduleComponent } from "@/types/schedule";
+import type { CurrentSession } from "@/lib/session";
 
 const RECENT_DAYS = 7;
 import { listTeachersBasic, type TeacherBasic } from "@/app/actions/teachers";
@@ -34,7 +35,10 @@ function addDays(isoDate: string, days: number): string {
   return toISODateLocal(d);
 }
 
-export default function ScheduleAssignment() {
+export default function ScheduleAssignment({ session }: { session: CurrentSession | null }) {
+  const isTeacher = session?.role === "teacher";
+  const ownTeacherId = session?.teacherId;
+
   const initialized = useScheduleStore((s) => s.initialized);
   const loading = useScheduleStore((s) => s.loading);
   const storeError = useScheduleStore((s) => s.error);
@@ -61,7 +65,10 @@ export default function ScheduleAssignment() {
 
   const [teachers, setTeachers] = useState<TeacherBasic[]>([]);
   // "all" | "unassigned" | teacherId — 학생 목록을 담당 선생님으로 좁힐 때 사용.
-  const [teacherFilter, setTeacherFilter] = useState<string>("all");
+  // 선생님 계정은 실수로 다른 선생님 학생을 배정하는 일을 막기 위해 항상 본인 학생으로 고정한다.
+  const [teacherFilter, setTeacherFilter] = useState<string>(
+    isTeacher && ownTeacherId ? ownTeacherId : "all"
+  );
   // "all" | subjectId — 학생 목록을 수강 과목으로 좁힐 때 사용.
   const [studentSubjectFilter, setStudentSubjectFilter] = useState<string>("all");
   // 학생 이름 검색어 — 부분 일치로 학생 목록을 좁힐 때 사용.
@@ -415,19 +422,25 @@ export default function ScheduleAssignment() {
       <section className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1">
           <span className="font-medium">선생님</span>
-          <select
-            className="border rounded px-2 py-1"
-            value={teacherFilter}
-            onChange={(e) => setTeacherFilter(e.target.value)}
-          >
-            <option value="all">전체</option>
-            {teachers.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-            <option value="unassigned">미배정</option>
-          </select>
+          {isTeacher ? (
+            <span className="border rounded px-2 py-1 bg-gray-50 dark:bg-neutral-900 text-gray-600 dark:text-gray-400">
+              {session?.teacherName} (내 학생)
+            </span>
+          ) : (
+            <select
+              className="border rounded px-2 py-1"
+              value={teacherFilter}
+              onChange={(e) => setTeacherFilter(e.target.value)}
+            >
+              <option value="all">전체</option>
+              {teachers.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+              <option value="unassigned">미배정</option>
+            </select>
+          )}
         </label>
 
         <label className="flex flex-col gap-1">
