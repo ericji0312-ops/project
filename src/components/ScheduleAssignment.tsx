@@ -64,6 +64,8 @@ export default function ScheduleAssignment() {
   const [teacherFilter, setTeacherFilter] = useState<string>("all");
   // "all" | subjectId — 학생 목록을 수강 과목으로 좁힐 때 사용.
   const [studentSubjectFilter, setStudentSubjectFilter] = useState<string>("all");
+  // 학생 이름 검색어 — 부분 일치로 학생 목록을 좁힐 때 사용.
+  const [studentSearch, setStudentSearch] = useState("");
 
   useEffect(() => {
     listTeachersBasic()
@@ -85,8 +87,11 @@ export default function ScheduleAssignment() {
       list = list.filter((s) => enrolledIds.has(s.id));
     }
 
+    const query = studentSearch.trim();
+    if (query) list = list.filter((s) => s.name.includes(query));
+
     return list;
-  }, [students, teacherFilter, studentSubjectFilter, studentSubjects]);
+  }, [students, teacherFilter, studentSubjectFilter, studentSubjects, studentSearch]);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deadlineMode, setDeadlineMode] = useState<"auto" | "manual">("auto");
@@ -439,6 +444,17 @@ export default function ScheduleAssignment() {
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="font-medium">학생 검색</span>
+          <input
+            type="text"
+            className="border rounded px-2 py-1"
+            placeholder="이름으로 검색"
+            value={studentSearch}
+            onChange={(e) => setStudentSearch(e.target.value)}
+          />
         </label>
 
         <label className="flex flex-col gap-1">
