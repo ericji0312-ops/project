@@ -808,7 +808,7 @@ export default function ScheduleAssignment({ session }: { session: CurrentSessio
               텍스트 지우기
             </button>
             <button
-              className="text-xs rounded px-2 py-1 bg-gray-800 text-white cursor-pointer transition-colors duration-150 hover:bg-gray-900 hover:shadow-md disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none disabled:bg-gray-100 disabled:text-gray-400 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-600"
+              className="text-xs rounded px-2 py-1 bg-blue-600 text-white cursor-pointer transition-colors duration-150 hover:bg-blue-700 hover:shadow-md disabled:cursor-not-allowed disabled:pointer-events-none disabled:shadow-none disabled:bg-gray-100 disabled:text-gray-400 dark:disabled:bg-neutral-900 dark:disabled:text-neutral-600"
               onClick={handleCopy}
               disabled={!copyText}
             >
