@@ -80,10 +80,15 @@ export default function ScheduleAssignment({ session }: { session: CurrentSessio
       .catch(() => setTeachers([]));
   }, []);
 
+  // "선생님" 필터만 적용한 목록 — 배정 필요 학생 배너는 과목/검색어로는 좁히지 않고 이 범위를 기준으로 삼는다.
+  const studentsInTeacherScope = useMemo(() => {
+    if (teacherFilter === "unassigned") return students.filter((s) => !s.teacherId);
+    if (teacherFilter !== "all") return students.filter((s) => s.teacherId === teacherFilter);
+    return students;
+  }, [students, teacherFilter]);
+
   const studentsForFilters = useMemo(() => {
-    let list = students;
-    if (teacherFilter === "unassigned") list = list.filter((s) => !s.teacherId);
-    else if (teacherFilter !== "all") list = list.filter((s) => s.teacherId === teacherFilter);
+    let list = studentsInTeacherScope;
 
     if (studentSubjectFilter !== "all") {
       const enrolledIds = new Set(
@@ -98,7 +103,31 @@ export default function ScheduleAssignment({ session }: { session: CurrentSessio
     if (query) list = list.filter((s) => s.name.includes(query));
 
     return list;
-  }, [students, teacherFilter, studentSubjectFilter, studentSubjects, studentSearch]);
+  }, [studentsInTeacherScope, studentSubjectFilter, studentSubjects, studentSearch]);
+
+  // 학생별 배정된 항목 중 가장 늦은 마감기한이 오늘보다 이전이거나(진도가 밀렸거나) 배정 기록이
+  // 아예 없으면 "배정 필요" 학생으로 분류한다. 과목/검색어 필터와 무관하게 선생님 범위 전체를 본다.
+  const needsAssignmentStudents = useMemo(() => {
+    const todayIso = toISODateLocal(new Date());
+    const latestDeadlineByStudent = new Map<string, string>();
+    for (const a of assignments) {
+      const prev = latestDeadlineByStudent.get(a.studentId);
+      if (!prev || a.deadlineDate > prev) latestDeadlineByStudent.set(a.studentId, a.deadlineDate);
+    }
+
+    return studentsInTeacherScope
+      .filter((s) => {
+        const latest = latestDeadlineByStudent.get(s.id);
+        return !latest || latest < todayIso;
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [studentsInTeacherScope, assignments]);
+
+  function handleBannerStudentClick(clickedStudentId: string) {
+    setStudentSearch("");
+    setStudentSubjectFilter("all");
+    handleStudentChange(clickedStudentId);
+  }
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deadlineMode, setDeadlineMode] = useState<"auto" | "manual">("auto");
@@ -416,6 +445,29 @@ export default function ScheduleAssignment({ session }: { session: CurrentSessio
   return (
     <div className="mx-auto max-w-5xl p-6 space-y-6 text-sm">
       <h1 className="text-xl font-bold">학습스케줄 배정</h1>
+
+      {needsAssignmentStudents.length > 0 && (
+        <section className="rounded border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 p-3 space-y-2">
+          <p className="font-medium text-amber-800 dark:text-amber-200">
+            오늘 기준 배정 필요 학생: {needsAssignmentStudents.length}명
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {needsAssignmentStudents.map((s) => (
+              <button
+                key={s.id}
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors duration-150 ${
+                  s.id === studentId
+                    ? "border-amber-500 bg-amber-600 text-white hover:bg-amber-700"
+                    : "border-amber-300 bg-white text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-neutral-900 dark:text-amber-200 dark:hover:bg-amber-900"
+                }`}
+                onClick={() => handleBannerStudentClick(s.id)}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {actionError && <p className="text-red-600">{actionError}</p>}
 
